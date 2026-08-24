@@ -6,8 +6,9 @@ build-backend = "setuptools.build_meta"
 name = "pympacds"
 version = "0.1.0"
 description = "Python Multi Process Asyncio-based Cooperative Discoverable Services Framework"
+readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "MIT"}
+license = "MIT"
 authors = [
     {name="Oscar Diaz", email="odiaz@ieee.org"}
 ]
@@ -15,7 +16,6 @@ keywords = ["dbus", "asyncio", "daemon", "framework", "embedded", "ipc"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
