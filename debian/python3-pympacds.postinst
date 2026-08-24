@@ -1,0 +1,20 @@
+#!/bin/sh
+set -e
+
+. /usr/share/debconf/confmodule
+
+case "$1" in
+    configure)
+        db_get pympacds/bus-prefix || true
+        BUS_PREFIX="$RET"
+        if [ -z "$BUS_PREFIX" ]; then
+            BUS_PREFIX="org.pympacds"
+        fi
+
+        if command -v pympacds-admin >/dev/null 2>&1; then
+            pympacds-admin setup --bus-prefix "$BUS_PREFIX"
+        fi
+        ;;
+esac
+
+#DEBHELPER#

@@ -1,0 +1,21 @@
+Source: pympacds
+Maintainer: Oscar Diaz <odiaz@ieee.org>
+Section: python
+Priority: optional
+Build-Depends: debhelper (>= 12~),
+ dh-python,
+ python3,
+ python3-setuptools,
+ pybuild-plugin-pyproject
+Standards-Version: 4.6.0
+X-Python3-Version: >= 3.10
+
+Package: python3-pympacds
+Architecture: all
+Depends: ${python3:Depends}, ${misc:Depends}
+Recommends: python3-dbus-fast | python3-dbus-next
+Description: Python Multi Process Asyncio-based Cooperative Discoverable Services Framework
+ pympacds is a D-Bus-native application framework for building modular,
+ multi-process, asyncio-based daemons on Linux. Services subclass the
+ framework's ProcessBase and communicate over the D-Bus system bus,
+ discovering peer services automatically.

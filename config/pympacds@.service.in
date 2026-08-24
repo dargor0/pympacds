@@ -1,0 +1,14 @@
+[Unit]
+Description=pympacds service: %i
+After=dbus.service
+Requires=dbus.service
+
+[Service]
+Type=simple
+User=@USER@
+ExecStart=@EXEC_START@ -c /etc/pympacds/%i.ini
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

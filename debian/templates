@@ -1,0 +1,10 @@
+Template: pympacds/bus-prefix
+Type: string
+Default: org.pympacds
+Description: D-Bus bus name prefix for pympacds services
+ The namespace prefix used by pympacds services on the D-Bus system bus.
+ All services share this prefix to discover each other automatically.
+ .
+ This value is written to the D-Bus security policy so that services may
+ claim names under this prefix. Change it only if you need to run multiple
+ independent pympacds systems on the same host.

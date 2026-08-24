@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pympacds"
+version = "0.1.0"
+description = "Python Multi Process Asyncio-based Cooperative Discoverable Services Framework"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name="Oscar Diaz", email="odiaz@ieee.org"}
+]
+keywords = ["dbus", "asyncio", "daemon", "framework", "embedded", "ipc"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+]
+
+[project.scripts]
+pympacds-admin = "pympacds.cli:main"
+
+[project.optional-dependencies]
+dbus-fast = ["dbus-fast>=4.0"]
+dbus-next = ["dbus-next>=0.2"]
+dev = ["pytest", "pytest-asyncio", "mypy", "ruff"]
+docs = ["sphinx>=7.0", "myst-parser>=2.0", "furo>=2023.9.10"]
+
+[project.entry-points."pympacds.middleware"]
+httpconfprov = "pympacds.middleware:HttpConfigMiddleware"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = [
+    "-v",
+    "--tb=short",
+]
+filterwarnings = [
+    # Third-party deprecation from PyGObject (triggered by the D-Bus library's
+    # GLib backend import); pympacds uses asyncio and does not use GLib.
+    "ignore:GLib.unix_signal_add_full is deprecated.*:gi.PyGIDeprecationWarning",
+]

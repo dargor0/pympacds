@@ -1,0 +1,10 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+    purge)
+        rm -f /etc/dbus-1/system.d/pympacds.conf
+        ;;
+esac
+
+#DEBHELPER#

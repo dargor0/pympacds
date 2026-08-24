@@ -1,0 +1,2 @@
+config/pympacds.conf.in usr/share/pympacds/
+config/pympacds@.service.in usr/share/pympacds/

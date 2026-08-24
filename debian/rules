@@ -1,0 +1,16 @@
+#!/usr/bin/make -f
+export DH_VERBOSE=1
+
+export PYBUILD_NAME=pympacds
+export PYBUILD_DISABLE=test
+export PYBUILD_SYSTEM=pyproject
+
+%:
+	dh $@ --with python3 --buildsystem=pybuild
+
+override_dh_builddeb:
+	# override for embedded linux distributions: some debian/ubuntu based
+	# distributions doesn't support default xz compression, it is better
+	# to force old gzip compression to avoid problems with constrained
+	# platforms.
+	dh_builddeb -- -Zgzip
