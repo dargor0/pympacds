@@ -1,0 +1,28 @@
+{
+  "mqtt": {
+    "keys": {
+      "host": {"type": "str"},
+      "port": {"type": "int", "min": 1, "max": 65535},
+      "client_id": {"type": "str"},
+      "keepalive": {"type": "int", "min": 0},
+      "username": {"type": "str"},
+      "password": {"type": "str"},
+      "mqtt_version": {"type": "str", "pattern": "^(3\\.1\\.1|5\\.0)$"},
+      "use_tls": {"type": "bool"},
+      "tls_ca": {"type": "str"},
+      "tls_certfile": {"type": "str"},
+      "tls_keyfile": {"type": "str"},
+      "tls_insecure": {"type": "bool"},
+      "qos": {"type": "int", "min": 0, "max": 2},
+      "connect_timeout_s": {"type": "int", "min": 0},
+      "loop_interval_s": {"type": "float", "min": 0},
+      "reconnect_min_s": {"type": "int", "min": 0},
+      "reconnect_max_s": {"type": "int", "min": 0},
+      "subscribe_topics": {"type": "str"},
+      "default_topic": {"type": "str"},
+      "queue_size": {"type": "int", "min": 0},
+      "lwt_topic": {"type": "str"},
+      "lwt_payload": {"type": "str"}
+    }
+  }
+}

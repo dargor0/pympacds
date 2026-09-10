@@ -252,9 +252,7 @@ class SignalActionMiddleware(MiddlewareBase):
 
         ok, argmap = self._parse_argmap(data.get("argmap"))
         if not ok:
-            self.logger.warning(
-                "signal_action: rule '%s' has invalid argmap; disabled", name
-            )
+            self.logger.warning("signal_action: rule '%s' has invalid argmap; disabled", name)
             return None
 
         try:
@@ -285,9 +283,7 @@ class SignalActionMiddleware(MiddlewareBase):
         await self._arm_all()
 
         if any(r.persistent for r in self._rules.values()):
-            self._rearm_task = asyncio.create_task(
-                self._rearm_loop(), name="signal_action:rearm"
-            )
+            self._rearm_task = asyncio.create_task(self._rearm_loop(), name="signal_action:rearm")
 
         self._setup_done = True
 
@@ -409,9 +405,7 @@ class SignalActionMiddleware(MiddlewareBase):
         self._dispatcher_tasks[rule.name] = task
         await self._arm_rule(rule)
         if rule.persistent and self._rearm_task is None:
-            self._rearm_task = asyncio.create_task(
-                self._rearm_loop(), name="signal_action:rearm"
-            )
+            self._rearm_task = asyncio.create_task(self._rearm_loop(), name="signal_action:rearm")
 
     async def remove_rule(self, name: str) -> bool:
         """Remove a rule, unsubscribing and cancelling its dispatcher."""
@@ -609,18 +603,14 @@ class SignalActionMiddleware(MiddlewareBase):
                 try:
                     await self._dispatch_signal(rule, event)
                 except Exception:
-                    self.logger.exception(
-                        "signal_action: rule '%s' dispatch error", rule.name
-                    )
+                    self.logger.exception("signal_action: rule '%s' dispatch error", rule.name)
         except asyncio.CancelledError:
             pass
 
     async def _dispatch_signal(self, rule: Rule, event: SignalEvent) -> None:
         targets = await self._resolve_action_targets(rule)
         if not targets:
-            self.logger.warning(
-                "signal_action: rule '%s' has no available target", rule.name
-            )
+            self.logger.warning("signal_action: rule '%s' has no available target", rule.name)
             self._emit_completed(rule, {"error": "no target available"})
             if rule.persistent:
                 self._add_pending(rule, event)

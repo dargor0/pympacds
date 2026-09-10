@@ -66,13 +66,20 @@ def test_schema_user_int_parse_error(ini_file, tmp_path):
 
 
 def test_schema_user_int_min(ini_file, tmp_path):
-    _schema_setup(ini_file, tmp_path, {"s": {"keys": {"n": {"type": "int", "min": 10}}}}, {"s": {"n": "5"}})
+    _schema_setup(
+        ini_file, tmp_path, {"s": {"keys": {"n": {"type": "int", "min": 10}}}}, {"s": {"n": "5"}}
+    )
     p = ProcessBase("t", "1.0")
     assert p.setup(["-c", ini_file]) is False
 
 
 def test_schema_user_float_max(ini_file, tmp_path):
-    _schema_setup(ini_file, tmp_path, {"s": {"keys": {"n": {"type": "float", "max": 1.0}}}}, {"s": {"n": "2.5"}})
+    _schema_setup(
+        ini_file,
+        tmp_path,
+        {"s": {"keys": {"n": {"type": "float", "max": 1.0}}}},
+        {"s": {"n": "2.5"}},
+    )
     p = ProcessBase("t", "1.0")
     assert p.setup(["-c", ini_file]) is False
 

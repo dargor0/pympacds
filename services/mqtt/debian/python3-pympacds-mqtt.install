@@ -1,0 +1,2 @@
+config/mqtt.ini.example usr/share/pympacds/
+config/mqtt.schema.json usr/share/pympacds/

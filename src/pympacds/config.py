@@ -117,7 +117,4 @@ class ConfigManager:
         import re
 
         if not re.match(kspec["pattern"], val):
-            errors.append(
-                f"{section}.{kname}: '{val}' does not match "
-                f"pattern '{kspec['pattern']}'"
-            )
+            errors.append(f"{section}.{kname}: '{val}' does not match pattern '{kspec['pattern']}'")

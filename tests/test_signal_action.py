@@ -147,7 +147,9 @@ MQTT_XML = """<node>
 
 class TestRuleParsing:
     def test_tag_rule_defaults(self):
-        mw, _ = make_mw({"r1": json.dumps({"trigger": "@gpio:line_changed", "action": "@mqtt:publish"})})
+        mw, _ = make_mw(
+            {"r1": json.dumps({"trigger": "@gpio:line_changed", "action": "@mqtt:publish"})}
+        )
         assert "r1" in mw._rules
         rule = mw._rules["r1"]
         assert rule.trigger.kind == "tag"
@@ -238,7 +240,9 @@ class TestResolution:
             "org.pympacds.gpio": {"provides": ["gpio"]},
             "org.pympacds.http": {"provides": ["http"]},
         }
-        mw, _ = make_mw({"r1": json.dumps({"trigger": "@gpio:line_changed", "action": "@http:send"})}, bus)
+        mw, _ = make_mw(
+            {"r1": json.dumps({"trigger": "@gpio:line_changed", "action": "@http:send"})}, bus
+        )
         friends = await mw._friends_by_tag("gpio")
         assert friends == ["org.pympacds.gpio"]
 
@@ -247,18 +251,29 @@ class TestResolution:
         bus = FakeBus()
         bus.friendbus = {"org.pympacds.gpio"}
         bus.tags = {"org.pympacds.gpio": {"provides": ["gpio"]}}
-        bus.trees = {"org.pympacds.gpio": {"/org/pympacds/gpio": node("/org/pympacds/gpio", GPIO_XML)}}
-        mw, _ = make_mw({"r1": json.dumps({"trigger": "@gpio:line_changed", "action": "@http:send"})}, bus)
+        bus.trees = {
+            "org.pympacds.gpio": {"/org/pympacds/gpio": node("/org/pympacds/gpio", GPIO_XML)}
+        }
+        mw, _ = make_mw(
+            {"r1": json.dumps({"trigger": "@gpio:line_changed", "action": "@http:send"})}, bus
+        )
         sources = await mw._resolve_trigger_sources(mw._rules["r1"])
         assert sources == [
-            ("org.pympacds.gpio", "/org/pympacds/gpio", "org.pympacds.GPIO", ["name", "offset", "value"])
+            (
+                "org.pympacds.gpio",
+                "/org/pympacds/gpio",
+                "org.pympacds.GPIO",
+                ["name", "offset", "value"],
+            )
         ]
 
     @pytest.mark.asyncio
     async def test_resolve_trigger_sources_explicit(self):
         bus = FakeBus()
         bus.friendbus = {"org.pympacds.gpio"}
-        bus.trees = {"org.pympacds.gpio": {"/org/pympacds/gpio": node("/org/pympacds/gpio", GPIO_XML)}}
+        bus.trees = {
+            "org.pympacds.gpio": {"/org/pympacds/gpio": node("/org/pympacds/gpio", GPIO_XML)}
+        }
         rule = {
             "trigger": "org.pympacds.gpio:org.pympacds.GPIO:line_changed",
             "action": "@http:send",
@@ -272,8 +287,12 @@ class TestResolution:
         bus = FakeBus()
         bus.friendbus = {"org.pympacds.mqtt"}
         bus.tags = {"org.pympacds.mqtt": {"provides": ["mqtt"]}}
-        bus.trees = {"org.pympacds.mqtt": {"/org/pympacds/mqtt": node("/org/pympacds/mqtt", MQTT_XML)}}
-        mw, _ = make_mw({"r1": json.dumps({"trigger": "@gpio:line_changed", "action": "@mqtt:publish"})}, bus)
+        bus.trees = {
+            "org.pympacds.mqtt": {"/org/pympacds/mqtt": node("/org/pympacds/mqtt", MQTT_XML)}
+        }
+        mw, _ = make_mw(
+            {"r1": json.dumps({"trigger": "@gpio:line_changed", "action": "@mqtt:publish"})}, bus
+        )
         targets = await mw._resolve_action_targets(mw._rules["r1"])
         assert targets[0][0:3] == ("org.pympacds.mqtt", "/org/pympacds/mqtt", "org.pympacds.MQTT")
 
@@ -306,9 +325,7 @@ class TestDispatch:
         await mw.setup()
         try:
             rule = mw._rules["r1"]
-            event = SignalEvent(
-                ["gpio0", 3, True], {}
-            )
+            event = SignalEvent(["gpio0", 3, True], {})
             await mw._dispatch_signal(rule, event)
             proxy = bus.proxies[("org.pympacds.mqtt", "/org/pympacds/mqtt", "org.pympacds.MQTT")]
             assert len(proxy.calls) == 1
@@ -336,9 +353,7 @@ class TestDispatch:
         await mw.setup()
         try:
             rule = mw._rules["r1"]
-            event = SignalEvent(
-                ["gpio0", 3, True], {}
-            )
+            event = SignalEvent(["gpio0", 3, True], {})
             await mw._dispatch_signal(rule, event)
             proxy = bus.proxies[("org.pympacds.mqtt", "/org/pympacds/mqtt", "org.pympacds.MQTT")]
             method, args = proxy.calls[0]
@@ -350,14 +365,22 @@ class TestDispatch:
     async def test_argmap_by_name_and_coercion(self):
         bus = self._gpio_to_mqtt()
         mw, _ = make_mw(
-            {"r1": json.dumps({"trigger": "@gpio:line_changed", "action": "@mqtt:publish", "argmap": '["{name}", "{value}"]'})},
+            {
+                "r1": json.dumps(
+                    {
+                        "trigger": "@gpio:line_changed",
+                        "action": "@mqtt:publish",
+                        "argmap": '["{name}", "{value}"]',
+                    }
+                )
+            },
             bus,
         )
         rule = mw._rules["r1"]
-        event = SignalEvent(
-            ["gpio0", 3, True], {"name": "gpio0", "offset": 3, "value": True}
+        event = SignalEvent(["gpio0", 3, True], {"name": "gpio0", "offset": 3, "value": True})
+        args = mw._map_args(
+            rule, event, {"in": [{"name": "topic", "type": "s"}, {"name": "payload", "type": "b"}]}
         )
-        args = mw._map_args(rule, event, {"in": [{"name": "topic", "type": "s"}, {"name": "payload", "type": "b"}]})
         assert args == ["gpio0", True]
 
     def test_coerce_bool(self):
@@ -371,7 +394,9 @@ class TestDispatch:
     async def test_unavailable_target_persistent_pending(self):
         bus = FakeBus()
         bus.friendbus = set()
-        mw, _ = make_mw({"r1": json.dumps({"trigger": "@gpio:line_changed", "action": "@mqtt:publish"})}, bus)
+        mw, _ = make_mw(
+            {"r1": json.dumps({"trigger": "@gpio:line_changed", "action": "@mqtt:publish"})}, bus
+        )
         rule = mw._rules["r1"]
         event = SignalEvent([], {})
         await mw._dispatch_signal(rule, event)
@@ -382,7 +407,15 @@ class TestDispatch:
         bus = FakeBus()
         bus.friendbus = set()
         mw, _ = make_mw(
-            {"r1": json.dumps({"trigger": "@gpio:line_changed", "action": "@mqtt:publish", "persistent": False})},
+            {
+                "r1": json.dumps(
+                    {
+                        "trigger": "@gpio:line_changed",
+                        "action": "@mqtt:publish",
+                        "persistent": False,
+                    }
+                )
+            },
             bus,
         )
         rule = mw._rules["r1"]
@@ -400,7 +433,11 @@ class TestQueue:
     def test_overflow_drops_oldest(self):
         bus = FakeBus()
         mw, _ = make_mw(
-            {"r1": json.dumps({"trigger": "@gpio:line_changed", "action": "@mqtt:publish", "queue_size": 2})},
+            {
+                "r1": json.dumps(
+                    {"trigger": "@gpio:line_changed", "action": "@mqtt:publish", "queue_size": 2}
+                )
+            },
             bus,
         )
         rule = mw._rules["r1"]
@@ -424,7 +461,9 @@ class TestRetry:
     @pytest.mark.asyncio
     async def test_persistent_retries_pending_on_rearm(self):
         bus = FakeBus()
-        mw, _ = make_mw({"r1": json.dumps({"trigger": "@gpio:line_changed", "action": "@mqtt:publish"})}, bus)
+        mw, _ = make_mw(
+            {"r1": json.dumps({"trigger": "@gpio:line_changed", "action": "@mqtt:publish"})}, bus
+        )
         rule = mw._rules["r1"]
         event = SignalEvent([], {})
         rule.pending.append(event)
@@ -432,7 +471,9 @@ class TestRetry:
         # now a target appears
         bus.friendbus = {"org.pympacds.mqtt"}
         bus.tags = {"org.pympacds.mqtt": {"provides": ["mqtt"]}}
-        bus.trees = {"org.pympacds.mqtt": {"/org/pympacds/mqtt": node("/org/pympacds/mqtt", MQTT_XML)}}
+        bus.trees = {
+            "org.pympacds.mqtt": {"/org/pympacds/mqtt": node("/org/pympacds/mqtt", MQTT_XML)}
+        }
 
         await mw._retry_pending(rule)
         assert rule.pending == []
@@ -444,7 +485,9 @@ class TestRearm:
     @pytest.mark.asyncio
     async def test_persistent_subscribes_when_peer_appears(self):
         bus = FakeBus()
-        mw, _ = make_mw({"r1": json.dumps({"trigger": "@gpio:line_changed", "action": "@mqtt:publish"})}, bus)
+        mw, _ = make_mw(
+            {"r1": json.dumps({"trigger": "@gpio:line_changed", "action": "@mqtt:publish"})}, bus
+        )
         rule = mw._rules["r1"]
         rule.queue = asyncio.Queue()
 
@@ -455,7 +498,9 @@ class TestRearm:
         # peer appears
         bus.friendbus = {"org.pympacds.gpio"}
         bus.tags = {"org.pympacds.gpio": {"provides": ["gpio"]}}
-        bus.trees = {"org.pympacds.gpio": {"/org/pympacds/gpio": node("/org/pympacds/gpio", GPIO_XML)}}
+        bus.trees = {
+            "org.pympacds.gpio": {"/org/pympacds/gpio": node("/org/pympacds/gpio", GPIO_XML)}
+        }
         await mw._arm_rule(rule)
         assert rule.active is True
         assert len(rule.subscriptions) == 1
@@ -475,7 +520,9 @@ class TestRearm:
 
 class TestExport:
     def test_get_rules_json(self):
-        mw, _ = make_mw({"r1": json.dumps({"trigger": "@gpio:line_changed", "action": "@mqtt:publish"})})
+        mw, _ = make_mw(
+            {"r1": json.dumps({"trigger": "@gpio:line_changed", "action": "@mqtt:publish"})}
+        )
         rules = json.loads(mw.signal_action_get_rules())
         assert len(rules) == 1
         assert rules[0]["name"] == "r1"
@@ -485,7 +532,9 @@ class TestExport:
     @pytest.mark.asyncio
     async def test_contract_exported_on_setup(self):
         bus = FakeBus()
-        mw, _ = make_mw({"r1": json.dumps({"trigger": "@gpio:line_changed", "action": "@mqtt:publish"})}, bus)
+        mw, _ = make_mw(
+            {"r1": json.dumps({"trigger": "@gpio:line_changed", "action": "@mqtt:publish"})}, bus
+        )
         await mw.setup()
         try:
             assert bus.exported
@@ -550,7 +599,9 @@ class TestProgrammaticRegistration:
         bus = FakeBus()
         bus.friendbus = {"org.pympacds.gpio"}
         bus.tags = {"org.pympacds.gpio": {"provides": ["gpio"]}}
-        bus.trees = {"org.pympacds.gpio": {"/org/pympacds/gpio": node("/org/pympacds/gpio", GPIO_XML)}}
+        bus.trees = {
+            "org.pympacds.gpio": {"/org/pympacds/gpio": node("/org/pympacds/gpio", GPIO_XML)}
+        }
         mw, _ = make_mw(None, bus)
         ok = await mw.register_rule("r", "@gpio:line_changed", "@mqtt:publish")
         assert ok is False  # no mqtt friend -> action not resolvable

@@ -66,9 +66,7 @@ class TestGetMiddlewareIntegration:
             def load(self):
                 return MW
 
-        monkeypatch.setattr(
-            importlib.metadata, "entry_points", lambda group: [FakeEP()]
-        )
+        monkeypatch.setattr(importlib.metadata, "entry_points", lambda group: [FakeEP()])
         process_base.config["middleware"] = {"fake_mw": "none"}
         process_base._init_middleware()
 
@@ -87,9 +85,7 @@ class TestGetMiddlewareIntegration:
             def load(self):
                 return MW
 
-        monkeypatch.setattr(
-            importlib.metadata, "entry_points", lambda group: [FakeEP()]
-        )
+        monkeypatch.setattr(importlib.metadata, "entry_points", lambda group: [FakeEP()])
         process_base.register_middleware = lambda: [MiddlewareSpec(MW, None)]
         process_base.config["middleware"] = {"fake_mw": "cfg_section"}
         process_base.config["cfg_section"] = {"k": "v"}
@@ -119,9 +115,7 @@ class TestGetMiddlewareIntegration:
             def load(self):
                 return FailingMW
 
-        monkeypatch.setattr(
-            importlib.metadata, "entry_points", lambda group: [FakeEP()]
-        )
+        monkeypatch.setattr(importlib.metadata, "entry_points", lambda group: [FakeEP()])
         process_base.config["middleware"] = {"failing_mw": "none"}
         process_base._init_middleware()
 

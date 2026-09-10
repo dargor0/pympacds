@@ -1,0 +1,35 @@
+[DEFAULT]
+loglevel = INFO
+logstdout = false
+logfile = /var/log/pympacds/mqtt.log
+
+[dbus]
+bus_prefix = org.pympacds
+contract_health = true
+contract_config = true
+validate_user_schema = true
+schema_file = /usr/share/pympacds/mqtt.schema.json
+
+[mqtt]
+host = localhost
+port = 1883
+client_id =
+keepalive = 60
+username =
+password =
+mqtt_version = 3.1.1
+use_tls = false
+tls_ca =
+tls_certfile =
+tls_keyfile =
+tls_insecure = false
+qos = 1
+connect_timeout_s = 10
+loop_interval_s = 1.0
+reconnect_min_s = 1
+reconnect_max_s = 60
+subscribe_topics = sensors/#
+default_topic =
+queue_size = 1000
+lwt_topic =
+lwt_payload =
