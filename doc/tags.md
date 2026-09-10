@@ -73,7 +73,7 @@ introducing a near-duplicate.
 The current standard services declare their tags as:
 
 - MQTT service: `provides: ["mqtt", "publish-subscribe"]`, `requires: ["network"]`
-- HTTP service: `provides: ["http"]`
+- HTTP service: `provides: ["http"], requires: ["network"]`
 - GPIO service: `provides: ["gpio"]`
 
 ## What tags are not

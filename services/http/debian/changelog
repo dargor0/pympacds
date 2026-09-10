@@ -1,0 +1,6 @@
+pympacds-http (0.1.0-1) unstable; urgency=medium
+
+  * Initial Debian packaging.
+  * HTTP client service with aiohttp and fire-and-forget request tokens.
+
+ -- Oscar Diaz <odiaz@ieee.org>  Wed, 10 Sep 2026 00:00:00 -0500

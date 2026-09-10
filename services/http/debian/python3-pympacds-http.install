@@ -1,0 +1,2 @@
+config/http.ini.example usr/share/pympacds/
+config/http.schema.json usr/share/pympacds/
