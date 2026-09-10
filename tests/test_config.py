@@ -33,9 +33,7 @@ class TestConfigManager:
         cp = configparser.ConfigParser()
         cp["test"] = {"answer": "42"}
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".ini", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".ini", delete=False) as f:
             path = f.name
 
         cm.write_ini(cp, path)
@@ -64,9 +62,7 @@ class TestConfigManager:
                 },
             }
         }
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(schema, f)
             schema_path = f.name
 
@@ -86,9 +82,7 @@ class TestConfigManager:
                 "keys": {"name": {"type": "str"}},
             }
         }
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(schema, f)
             schema_path = f.name
 
@@ -107,9 +101,7 @@ class TestConfigManager:
                 "keys": {"count": {"type": "int"}},
             }
         }
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(schema, f)
             schema_path = f.name
 
@@ -128,9 +120,7 @@ class TestConfigManager:
                 "keys": {"count": {"type": "int", "min": 1, "max": 10}},
             }
         }
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(schema, f)
             schema_path = f.name
 
@@ -140,6 +130,8 @@ class TestConfigManager:
         errors = cm.validate(cp)
         assert any("max" in e for e in errors)
         os.unlink(schema_path)
+
+
 """Additional tests for config validation edge cases."""
 
 import configparser

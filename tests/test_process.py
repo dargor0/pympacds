@@ -132,9 +132,7 @@ class TestEventLoop:
             evt.set()
 
         asyncio.create_task(fire())
-        await process_base.do_waitexit(
-            events=[asyncio.ensure_future(evt.wait())]
-        )
+        await process_base.do_waitexit(events=[asyncio.ensure_future(evt.wait())])
         assert evt.is_set()
 
     def test_update_tasks_noop(self, process_base):
@@ -175,6 +173,8 @@ class TestMiddlewareIntegration:
         p.setup(["-c", ini_file])
         atives = p._load_middleware_from_config()
         assert ("test_mw", "my_section") in atives
+
+
 """Tests for process.py lifecycle — middleware, start(), schema validation."""
 
 import configparser
@@ -292,11 +292,13 @@ class TestMiddlewareDiscovery:
 
         # Create a fake module with a middleware class
         mod_path = tmp_path / "fake_mw.py"
-        mod_path.write_text(textwrap.dedent("""\
+        mod_path.write_text(
+            textwrap.dedent("""\
             from pympacds.middleware import MiddlewareBase
             class FakeMiddleware(MiddlewareBase):
                 pass
-        """))
+        """)
+        )
         sys.path.insert(0, str(tmp_path))
 
         try:
@@ -308,6 +310,7 @@ class TestMiddlewareDiscovery:
 
                 def load(self):
                     from fake_mw import FakeMiddleware
+
                     return FakeMiddleware
 
             def fake_entry_points(group):
@@ -332,6 +335,57 @@ class TestMiddlewareDiscovery:
             assert process_base._middleware_instances[0].config["param"] == "value"
         finally:
             sys.path.pop(0)
+
+    def test_programmatic_middleware_singleton(self, process_base, tmp_path, monkeypatch):
+        """Programmatic middleware + matching [middleware] entry → one instance."""
+        import sys
+        import textwrap
+        from pympacds.middleware import MiddlewareSpec
+
+        mod_path = tmp_path / "prog_mw.py"
+        mod_path.write_text(
+            textwrap.dedent("""\
+            from pympacds.middleware import MiddlewareBase
+            class ProgMiddleware(MiddlewareBase):
+                pass
+        """)
+        )
+        sys.path.insert(0, str(tmp_path))
+        try:
+            import importlib.metadata
+            from prog_mw import ProgMiddleware
+
+            class FakeEntryPoint:
+                name = "prog_mw"
+
+                def load(self):
+                    return ProgMiddleware
+
+            monkeypatch.setattr(
+                importlib.metadata,
+                "entry_points",
+                lambda group: [FakeEntryPoint()] if group == "pympacds.middleware" else [],
+            )
+
+            cp = configparser.ConfigParser()
+            cp.read(process_base.args.configfile)
+            cp["middleware"] = {"prog_mw": "cfg_sec"}
+            cp["cfg_sec"] = {"param": "value"}
+            with open(process_base.args.configfile, "w") as f:
+                cp.write(f)
+            process_base.config.read(process_base.args.configfile)
+
+            process_base.register_middleware = lambda: [MiddlewareSpec(ProgMiddleware, None)]
+            process_base._init_middleware()
+
+            assert len(process_base._middleware_instances) == 1
+            mw = process_base._middleware_instances[0]
+            assert mw.section == "cfg_sec"
+            assert mw.config["param"] == "value"
+        finally:
+            sys.path.pop(0)
+
+
 """Push process.py over 80% with direct asyncio tests."""
 
 import asyncio
@@ -345,29 +399,44 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 
 class MockBus:
-    async def connect(self): return self
-    async def request_name(self, *a): pass
-    async def stop(self): pass
-    def disconnect(self): pass
-    async def wait_for_disconnect(self): pass
+    async def connect(self):
+        return self
+
+    async def request_name(self, *a):
+        pass
+
+    async def stop(self):
+        pass
+
+    def disconnect(self):
+        pass
+
+    async def wait_for_disconnect(self):
+        pass
 
     @property
     def _writer(self):
         class W:
             class M:
-                def __len__(self): return 0
+                def __len__(self):
+                    return 0
+
             messages = M()
+
         return W()
 
 
 def _make_svc(name):
     from pympacds.process import ProcessBase
+
     class Svc(ProcessBase):
         def __init__(self):
             super().__init__(name, "1.0")
+
         async def start_dbus(self):
             self.bus = MockBus()
             return True
+
     return Svc
 
 
@@ -387,9 +456,7 @@ class TestDirectLifecycle:
         svc = _make_svc("b")()
         svc.setup(["-c", ini_file])
         assert await svc.init_loop()
-        svc.tasklist["quick"] = asyncio.create_task(
-            asyncio.sleep(0), name="quick"
-        )
+        svc.tasklist["quick"] = asyncio.create_task(asyncio.sleep(0), name="quick")
         # manually do one iteration of main_loop
         svc.exitevent.set()
         await svc.close_loop()
@@ -399,9 +466,7 @@ class TestDirectLifecycle:
         svc = _make_svc("c")()
         svc.setup(["-c", ini_file])
         assert await svc.init_loop()
-        svc.tasklist["pending"] = asyncio.create_task(
-            asyncio.sleep(0), name="pending"
-        )
+        svc.tasklist["pending"] = asyncio.create_task(asyncio.sleep(0), name="pending")
         await asyncio.sleep(0.01)
         svc.exitevent.set()
         await svc.close_loop()
@@ -410,11 +475,13 @@ class TestDirectLifecycle:
     @pytest.mark.asyncio
     async def test_do_waitexit_cancelled(self, process_base):
         process_base.exitevent = asyncio.Event()
+
         # CancelledError is re-raised only when timeout > 0
         # Simulate by creating an external cancellation
         async def canceller():
             await asyncio.sleep(0.01)
             raise asyncio.CancelledError
+
         # The CancelledError from canceller() task doesn't propagate to do_waitexit
         # directly. do_waitexit catches CancelledError from its OWN context.
         # Just confirm the timeout path works:
@@ -457,6 +524,8 @@ class TestSchemaFileConfig:
         p = ProcessBase("e", "1.0")
         assert p.setup(["-c", ini_file]) is True
         assert p._schema_file is None
+
+
 """Direct asyncio tests for the remaining process.py uncovered lines."""
 
 import asyncio
@@ -467,17 +536,30 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 
 class MockBus:
-    async def connect(self): return self
-    async def request_name(self, *a): pass
-    async def stop(self): pass
-    def disconnect(self): pass
-    async def wait_for_disconnect(self): pass
+    async def connect(self):
+        return self
+
+    async def request_name(self, *a):
+        pass
+
+    async def stop(self):
+        pass
+
+    def disconnect(self):
+        pass
+
+    async def wait_for_disconnect(self):
+        pass
+
     @property
     def _writer(self):
         class W:
             class M:
-                def __len__(self): return 0
+                def __len__(self):
+                    return 0
+
             messages = M()
+
         return W()
 
 
@@ -486,8 +568,11 @@ async def test_init_loop_failure_path(ini_file):
     from pympacds.process import ProcessBase
 
     class Svc(ProcessBase):
-        def __init__(self): super().__init__("f", "1.0")
-        async def start_dbus(self): return False
+        def __init__(self):
+            super().__init__("f", "1.0")
+
+        async def start_dbus(self):
+            return False
 
     svc = Svc()
     svc.setup(["-c", ini_file])
@@ -500,7 +585,9 @@ async def test_init_loop_and_close_directly(ini_file):
     from pympacds.process import ProcessBase
 
     class Svc(ProcessBase):
-        def __init__(self): super().__init__("g", "1.0")
+        def __init__(self):
+            super().__init__("g", "1.0")
+
         async def start_dbus(self):
             self.bus = MockBus()
             return True
@@ -518,15 +605,20 @@ async def test_main_loop_full(ini_file):
     from pympacds.process import ProcessBase
 
     class Svc(ProcessBase):
-        def __init__(self): super().__init__("h", "1.0")
+        def __init__(self):
+            super().__init__("h", "1.0")
+
         async def start_dbus(self):
             self.bus = MockBus()
             return True
+
         def update_tasks(self):
             if "exit" not in self.tasklist:
+
                 async def fire():
                     await asyncio.sleep(0.01)
                     self.exitevent.set()
+
                 self.tasklist["exit"] = asyncio.create_task(fire(), name="exit")
 
     svc = Svc()
@@ -543,8 +635,11 @@ async def test_main_loop_init_fails(ini_file):
     from pympacds.process import ProcessBase
 
     class Svc(ProcessBase):
-        def __init__(self): super().__init__("i", "1.0")
-        async def start_dbus(self): return False
+        def __init__(self):
+            super().__init__("i", "1.0")
+
+        async def start_dbus(self):
+            return False
 
     svc = Svc()
     svc.setup(["-c", ini_file])

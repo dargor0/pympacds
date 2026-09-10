@@ -22,9 +22,14 @@ class MockDBusManager:
 
 
 class MockLogger:
-    def debug(self, msg, *args): pass
-    def warning(self, msg, *args): pass
-    def exception(self, msg, *args): pass
+    def debug(self, msg, *args):
+        pass
+
+    def warning(self, msg, *args):
+        pass
+
+    def exception(self, msg, *args):
+        pass
 
 
 @pytest.mark.asyncio
@@ -55,11 +60,7 @@ async def test_connect_friendbus_removed_friend():
 
     busobj = MockDBusManager()
     logger = MockLogger()
-    busdict = {
-        "org.pympacds.stale_svc": {
-            "busif": "proxy_stale_svc", "mcb": "cb_stale"
-        }
-    }
+    busdict = {"org.pympacds.stale_svc": {"busif": "proxy_stale_svc", "mcb": "cb_stale"}}
     callbacks = []
 
     def cb(busname, busif, mcb):

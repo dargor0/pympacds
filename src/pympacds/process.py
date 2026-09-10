@@ -8,8 +8,13 @@ import logging.handlers
 import configparser
 import argparse
 import asyncio
+from typing import TYPE_CHECKING
 
 from .dbus import DBusManager
+
+if TYPE_CHECKING:
+    from .middleware import MiddlewareSpec
+
 
 class ProcessBase:
     """Base class for all pympacds services.
@@ -36,10 +41,8 @@ class ProcessBase:
 
         self.config = configparser.ConfigParser()
         self.argparser = argparse.ArgumentParser(description=description)
-        self.argparser.add_argument(
-            "-c", "--configfile", help="Main configuration file"
-        )
-        
+        self.argparser.add_argument("-c", "--configfile", help="Main configuration file")
+
         self.bus = None
 
         self.exitevent: asyncio.Event | None = None
@@ -103,9 +106,7 @@ class ProcessBase:
             return
         dbus_cfg = self.config["dbus"]
         self._bus_prefix = dbus_cfg.get("bus_prefix", self._bus_prefix)
-        self._validate_user_schema = dbus_cfg.getboolean(
-            "validate_user_schema", True
-        )
+        self._validate_user_schema = dbus_cfg.getboolean("validate_user_schema", True)
         if self._validate_user_schema:
             self._schema_file = dbus_cfg.get("schema_file", None) or None
 
@@ -155,9 +156,7 @@ class ProcessBase:
             logsuffix = self.config["DEFAULT"].get("logfilesuffix", "")
             if logsuffix:
                 logf = os.path.splitext(logfile)
-                logfile = (
-                    logf[0] + "_" + getattr(self.args, logsuffix, "") + logf[1]
-                )
+                logfile = logf[0] + "_" + getattr(self.args, logsuffix, "") + logf[1]
             logbasedir = os.path.dirname(logfile)
             if not os.path.isdir(logbasedir):
                 try:
@@ -235,31 +234,48 @@ class ProcessBase:
     def _validate_dbus_section(self, errors: list[str]) -> None:
         """Validate keys in the [dbus] section."""
         d = self.config["dbus"] if self.config.has_section("dbus") else {}
+        self._check_bus_type(d, errors)
+        self._check_drain_timeout(d, errors)
+        self._check_contract_flags(d, errors)
+        self._check_heartbeat(d, errors)
+        self._check_discovery(d, errors)
+
+    def _check_bus_type(self, d, errors: list[str]) -> None:
         bt = d.get("bus_type", "system")
         if bt not in {"system", "session"}:
             errors.append(f"dbus.bus_type: must be 'system' or 'session', got '{bt}'")
+
+    def _check_drain_timeout(self, d, errors: list[str]) -> None:
         try:
             dto = d.getint("drain_timeout_ms", 2000) if d else 2000
             if dto < 0:
                 raise ValueError
         except (ValueError, TypeError):
             errors.append("dbus.drain_timeout_ms: must be a non-negative integer")
-        for key in ("contract_health", "contract_metrics",
-                     "contract_lifecycle", "contract_config"):
+
+    def _check_contract_flags(self, d, errors: list[str]) -> None:
+        for key in (
+            "contract_health",
+            "contract_metrics",
+            "contract_lifecycle",
+            "contract_config",
+        ):
             if d and key in d:
                 try:
                     d.getboolean(key)
                 except ValueError:
                     errors.append(f"dbus.{key}: must be true/false")
+
+    def _check_heartbeat(self, d, errors: list[str]) -> None:
         if d and "heartbeat_interval_s" in d:
             try:
                 hb = d.getint("heartbeat_interval_s")
                 if hb < 5 or hb > 3600:
                     raise ValueError
             except (ValueError, TypeError):
-                errors.append(
-                    "dbus.heartbeat_interval_s: must be an integer between 5 and 3600"
-                )
+                errors.append("dbus.heartbeat_interval_s: must be an integer between 5 and 3600")
+
+    def _check_discovery(self, d, errors: list[str]) -> None:
         if d and "discovery_enabled" in d:
             try:
                 d.getboolean("discovery_enabled")
@@ -278,65 +294,70 @@ class ProcessBase:
             return
 
         for section, spec in schema.items():
-            if section in ("DEFAULT", "dbus"):
-                continue
-            if not self.config.has_section(section):
-                continue
-            required = spec.get("required", [])
-            keys = spec.get("keys", {})
-            for rk in required:
-                if rk not in self.config[section]:
-                    errors.append(f"{section}.{rk}: required key is missing")
-            for kname, kspec in keys.items():
-                if kname not in self.config[section]:
-                    if "default" in kspec:
-                        self.config[section][kname] = str(kspec["default"])
-                    continue
-                val = self.config[section][kname]
-                ktype = kspec.get("type", "str")
-                if ktype == "int":
-                    try:
-                        ival = int(val)
-                        if "min" in kspec and ival < kspec["min"]:
-                            errors.append(
-                                f"{section}.{kname}: {ival} < min {kspec['min']}"
-                            )
-                        if "max" in kspec and ival > kspec["max"]:
-                            errors.append(
-                                f"{section}.{kname}: {ival} > max {kspec['max']}"
-                            )
-                    except ValueError:
-                        errors.append(f"{section}.{kname}: expected int, got '{val}'")
-                elif ktype == "float":
-                    try:
-                        fval = float(val)
-                        if "min" in kspec and fval < kspec["min"]:
-                            errors.append(
-                                f"{section}.{kname}: {fval} < min {kspec['min']}"
-                            )
-                        if "max" in kspec and fval > kspec["max"]:
-                            errors.append(
-                                f"{section}.{kname}: {fval} > max {kspec['max']}"
-                            )
-                    except ValueError:
-                        errors.append(
-                            f"{section}.{kname}: expected float, got '{val}'"
-                        )
-                elif ktype == "bool":
-                    try:
-                        self.config.getboolean(section, kname)
-                    except ValueError:
-                        errors.append(
-                            f"{section}.{kname}: expected bool, got '{val}'"
-                        )
-                elif ktype == "str" and "pattern" in kspec:
-                    import re
+            self._validate_user_section(section, spec, errors)
 
-                    if not re.match(kspec["pattern"], val):
-                        errors.append(
-                            f"{section}.{kname}: '{val}' does not match "
-                            f"pattern '{kspec['pattern']}'"
-                        )
+    def _validate_user_section(self, section, spec, errors: list[str]) -> None:
+        if section in ("DEFAULT", "dbus"):
+            return
+        if not self.config.has_section(section):
+            return
+        for rk in spec.get("required", []):
+            if rk not in self.config[section]:
+                errors.append(f"{section}.{rk}: required key is missing")
+        for kname, kspec in spec.get("keys", {}).items():
+            if kname not in self.config[section]:
+                if "default" in kspec:
+                    self.config[section][kname] = str(kspec["default"])
+                continue
+            self._check_user_key(section, kname, self.config[section][kname], kspec, errors)
+
+    def _check_user_key(self, section, kname, val, kspec, errors: list[str]) -> None:
+        ktype = kspec.get("type", "str")
+        if ktype == "int":
+            self._check_user_int(section, kname, val, kspec, errors)
+        elif ktype == "float":
+            self._check_user_float(section, kname, val, kspec, errors)
+        elif ktype == "bool":
+            self._check_user_bool(section, kname, val, errors)
+        elif ktype == "str" and "pattern" in kspec:
+            self._check_user_pattern(section, kname, val, kspec, errors)
+
+    def _check_user_int(self, section, kname, val, kspec, errors: list[str]) -> None:
+        try:
+            ival = int(val)
+        except ValueError:
+            errors.append(f"{section}.{kname}: expected int, got '{val}'")
+            return
+        if "min" in kspec and ival < kspec["min"]:
+            errors.append(f"{section}.{kname}: {ival} < min {kspec['min']}")
+        if "max" in kspec and ival > kspec["max"]:
+            errors.append(f"{section}.{kname}: {ival} > max {kspec['max']}")
+
+    def _check_user_float(self, section, kname, val, kspec, errors: list[str]) -> None:
+        try:
+            fval = float(val)
+        except ValueError:
+            errors.append(f"{section}.{kname}: expected float, got '{val}'")
+            return
+        if "min" in kspec and fval < kspec["min"]:
+            errors.append(f"{section}.{kname}: {fval} < min {kspec['min']}")
+        if "max" in kspec and fval > kspec["max"]:
+            errors.append(f"{section}.{kname}: {fval} > max {kspec['max']}")
+
+    def _check_user_bool(self, section, kname, val, errors: list[str]) -> None:
+        try:
+            self.config.getboolean(section, kname)
+        except ValueError:
+            errors.append(f"{section}.{kname}: expected bool, got '{val}'")
+
+    def _check_user_pattern(self, section, kname, val, kspec, errors: list[str]) -> None:
+        import re
+
+        if not re.match(kspec["pattern"], val):
+            errors.append(
+                f"{section}.{kname}: '{val}' does not match "
+                f"pattern '{kspec['pattern']}'"
+            )
 
     # ------------------------------------------------------------------
     # asyncio lifecycle
@@ -352,7 +373,7 @@ class ProcessBase:
             self.logger.error("Configuration validation failed. Exiting.")
             sys.exit(1)
         asyncio.run(self.main_loop())
-        
+
     def setup_dbus(self) -> None:
         """Initialize D-Bus resources. Here the Contract should be added."""
         self.bus = DBusManager(
@@ -366,10 +387,33 @@ class ProcessBase:
         Returns:
             True on success, False on failure.
         """
-        
-        raise NotImplementedError(
-            "start_dbus() coroutine must be subclassed."
-        )
+
+        raise NotImplementedError("start_dbus() coroutine must be subclassed.")
+
+    # ------------------------------------------------------------------
+    # capability tags (REQ-SVC-014)
+    # ------------------------------------------------------------------
+
+    def _collect_contract_tags(self, attr: str) -> list[str]:
+        """Aggregate the given tag attribute (``iface_provides``/``iface_requires``)
+        across all registered contracts, preserving order and uniqueness."""
+        tags: list[str] = []
+        if self.bus is None:
+            return tags
+        for ifaces in getattr(self.bus, "ifacelist", {}).values():
+            for iface in ifaces:
+                for tag in getattr(iface, attr, ()) or ():
+                    if tag not in tags:
+                        tags.append(tag)
+        return tags
+
+    def dbus_health_get_provides(self) -> list[str]:
+        """Return the union of ``provides`` tags across all contracts."""
+        return self._collect_contract_tags("iface_provides")
+
+    def dbus_health_get_requires(self) -> list[str]:
+        """Return the union of ``requires`` tags across all contracts."""
+        return self._collect_contract_tags("iface_requires")
 
     async def init_loop(self) -> bool:
         """Initialize the asyncio event loop.
@@ -393,9 +437,7 @@ class ProcessBase:
             return False
 
         self.tasklist.clear()
-        self.tasklist["WaitExit"] = asyncio.create_task(
-            self.do_waitexit(), name="WaitExit"
-        )
+        self.tasklist["WaitExit"] = asyncio.create_task(self.do_waitexit(), name="WaitExit")
         return True
 
     async def main_loop(self) -> None:
@@ -430,29 +472,7 @@ class ProcessBase:
     async def close_loop(self) -> None:
         """Gracefully cancel tasks, tear down middleware, disconnect D-Bus."""
         for tname, t in list(self.tasklist.items()):
-            if not t.done():
-                try:
-                    await asyncio.wait_for(t, timeout=0.01)
-                except (asyncio.CancelledError, asyncio.TimeoutError):
-                    pass
-                except Exception:
-                    self.logger.exception(
-                        "Wait for cancelled task %s exception", tname
-                    )
-                    continue
-                t.cancel()
-                try:
-                    await asyncio.wait_for(t, timeout=1)
-                except asyncio.CancelledError:
-                    pass
-                except asyncio.TimeoutError:
-                    self.logger.error(
-                        "Wait for cancelled task %s timeout", tname
-                    )
-                except Exception:
-                    self.logger.exception(
-                        "Wait for cancelled task %s exception", tname
-                    )
+            await self._cancel_task(tname, t)
 
         # middleware teardown (reverse order)
         for mw in reversed(self._middleware_instances):
@@ -466,6 +486,27 @@ class ProcessBase:
             await self.bus.stop()
 
         self.logger.debug("Exit done.")
+
+    async def _cancel_task(self, tname: str, t: asyncio.Task) -> None:
+        """Cancel a single task, waiting briefly for natural completion first."""
+        if t.done():
+            return
+        try:
+            await asyncio.wait_for(t, timeout=0.01)
+        except (asyncio.CancelledError, asyncio.TimeoutError):
+            pass
+        except Exception:
+            self.logger.exception("Wait for cancelled task %s exception", tname)
+            return
+        t.cancel()
+        try:
+            await asyncio.wait_for(t, timeout=1)
+        except asyncio.CancelledError:
+            pass
+        except asyncio.TimeoutError:
+            self.logger.error("Wait for cancelled task %s timeout", tname)
+        except Exception:
+            self.logger.exception("Wait for cancelled task %s exception", tname)
 
     def update_tasks(self) -> None:
         """Hook called on every main loop iteration.
@@ -488,9 +529,7 @@ class ProcessBase:
             if events is not None:
                 local = [asyncio.ensure_future(e) for e in events]
                 local.append(asyncio.ensure_future(self.exitevent.wait()))
-                await asyncio.wait(
-                    local, timeout=timeout, return_when=asyncio.FIRST_COMPLETED
-                )
+                await asyncio.wait(local, timeout=timeout, return_when=asyncio.FIRST_COMPLETED)
             elif timeout is not None and timeout > 0:
                 await asyncio.wait_for(self.exitevent.wait(), timeout=timeout)
             else:
@@ -516,14 +555,10 @@ class ProcessBase:
             try:
                 loop.add_signal_handler(
                     signum,
-                    lambda s=signum: asyncio.create_task(
-                        self._signal_term_handler(s)
-                    ),
+                    lambda s=signum: asyncio.create_task(self._signal_term_handler(s)),
                 )
             except (ValueError, OSError):
-                self.logger.exception(
-                    "Cannot register signal handler for %d", signum
-                )
+                self.logger.exception("Cannot register signal handler for %d", signum)
 
     async def _signal_term_handler(self, signum: int) -> None:
         """Handle a termination signal."""
@@ -552,8 +587,41 @@ class ProcessBase:
             result.append((key, section))
         return result
 
+    def register_middleware(self) -> "list[MiddlewareSpec]":
+        """Hook for declaring unconditional middleware (REQ-SVC-015).
+
+        Subclasses override this to return a list of ``MiddlewareSpec`` objects
+        that the framework always activates, regardless of the ``[middleware]``
+        INI section. The base implementation declares none.
+        """
+        return []
+
+    def _resolve_middleware_class(self, ep_map: dict, ident) -> type | None:
+        """Resolve a programmatic middleware identifier to a class.
+
+        ``ident`` may be a ``MiddlewareBase`` subclass or an entry-point name
+        (string) registered under the ``pympacds.middleware`` group.
+        """
+        if isinstance(ident, str):
+            if ident not in ep_map:
+                self.logger.error("Middleware '%s' not found in installed entry points", ident)
+                return None
+            try:
+                return ep_map[ident].load()
+            except Exception:
+                self.logger.exception("Failed to load middleware '%s'", ident)
+                return None
+        return ident
+
     def _init_middleware(self) -> None:
-        """Discover and instantiate enabled middleware (sync phase)."""
+        """Discover and instantiate middleware (sync phase).
+
+        Programmatic middleware (from ``register_middleware()``) are
+        instantiated first, then config-activated middleware (from
+        ``[middleware]``). If the same middleware appears in both, a single
+        instance is kept and the ``[middleware]`` section updates it
+        (singleton rule, REQ-MIDW-015).
+        """
         try:
             import importlib.metadata
         except ImportError:
@@ -563,21 +631,71 @@ class ProcessBase:
         eps = importlib.metadata.entry_points(group="pympacds.middleware")
         ep_map = {ep.name: ep for ep in eps}
 
-        for mw_name, section in self._load_middleware_from_config():
-            if mw_name not in ep_map:
-                self.logger.error(
-                    "Middleware '%s' not found in installed entry points", mw_name
+        instances: list = []
+        by_class: dict = {}
+
+        self._load_programmatic_middleware(ep_map, instances, by_class)
+        self._load_config_middleware(ep_map, instances, by_class)
+
+        self._middleware_instances = instances
+
+    def _load_programmatic_middleware(self, ep_map, instances, by_class) -> None:
+        """Instantiate always-on middleware from ``register_middleware()``."""
+        for spec in self.register_middleware():
+            cls = self._resolve_middleware_class(ep_map, spec.middleware)
+            if cls is None:
+                continue
+            if cls in by_class:
+                self.logger.debug(
+                    "Programmatic middleware '%s' already declared; skipping",
+                    getattr(cls, "__name__", cls),
                 )
                 continue
             try:
-                cls = ep_map[mw_name].load()
-                instance = cls(self, section)
-                self._middleware_instances.append(instance)
-                self.logger.debug("Middleware '%s' instantiated", mw_name)
+                instance = cls(self, spec.section)
             except Exception:
                 self.logger.exception(
-                    "Failed to instantiate middleware '%s'", mw_name
+                    "Failed to instantiate programmatic middleware '%s'",
+                    getattr(cls, "__name__", cls),
                 )
+                continue
+            instances.append(instance)
+            by_class[cls] = instance
+            self.logger.debug(
+                "Programmatic middleware '%s' instantiated",
+                getattr(cls, "__name__", cls),
+            )
+
+    def _load_config_middleware(self, ep_map, instances, by_class) -> None:
+        """Instantiate config-activated middleware from the ``[middleware]`` section."""
+        for mw_name, section in self._load_middleware_from_config():
+            if mw_name not in ep_map:
+                self.logger.error("Middleware '%s' not found in installed entry points", mw_name)
+                continue
+            try:
+                cls = ep_map[mw_name].load()
+            except Exception:
+                self.logger.exception("Failed to load middleware '%s'", mw_name)
+                continue
+            if cls in by_class:
+                # singleton: config updates the existing instance's section
+                mw = by_class[cls]
+                mw.section = section
+                mw._config = (
+                    self.config[section]
+                    if section is not None and self.config.has_section(section)
+                    else {}
+                )
+                self.logger.debug("Middleware '%s' section updated from config", mw_name)
+                continue
+            try:
+                instance = cls(self, section)
+            except Exception:
+                self.logger.exception("Failed to instantiate middleware '%s'", mw_name)
+                continue
+            instances.append(instance)
+            by_class[cls] = instance
+            self.logger.debug("Middleware '%s' instantiated", mw_name)
 
     async def _setup_middleware(self) -> bool:
         """Run async setup for all middleware instances."""
@@ -587,14 +705,10 @@ class ProcessBase:
                 await mw.setup()
             except Exception as exc:
                 if not mw.on_error(exc):
-                    self.logger.error(
-                        "Middleware setup failed (aborting): %s", exc
-                    )
+                    self.logger.error("Middleware setup failed (aborting): %s", exc)
                     return False
                 failed.append(i)
-                self.logger.warning(
-                    "Middleware setup error (continuing): %s", exc
-                )
+                self.logger.warning("Middleware setup error (continuing): %s", exc)
         # remove failed middleware from the list
         for i in reversed(failed):
             self._middleware_instances.pop(i)

@@ -51,18 +51,14 @@ class CollectorService(ProcessBase):
 
     def update_tasks(self) -> None:
         if "scanner" not in self.tasklist:
-            self.tasklist["scanner"] = asyncio.create_task(
-                self._scan_friends(), name="scanner"
-            )
+            self.tasklist["scanner"] = asyncio.create_task(self._scan_friends(), name="scanner")
 
     def dbus_collector_get_last_value(self) -> int:
         return self._last_value
 
     def _on_measurement(self, uid: str, value: int) -> None:
         self._last_value = value
-        self.logger.info(
-            "Received measurement: sensor_uid=%s value=%d", uid, value
-        )
+        self.logger.info("Received measurement: sensor_uid=%s value=%d", uid, value)
 
     async def _scan_friends(self) -> None:
         """Periodically discover sensors sharing the bus prefix and subscribe
@@ -85,9 +81,7 @@ class CollectorService(ProcessBase):
                             self._sensors[busname] = proxy
                             self.logger.info("Subscribed to sensor: %s", busname)
                         except Exception:
-                            self.logger.exception(
-                                "Unable to subscribe to sensor %s", busname
-                            )
+                            self.logger.exception("Unable to subscribe to sensor %s", busname)
 
                 # unsubscribe from departed sensors
                 for busname in list(self._sensors):

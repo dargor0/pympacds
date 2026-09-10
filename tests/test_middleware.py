@@ -49,6 +49,8 @@ class TestMiddlewareBase:
 
         mw = TolerantMiddleware(process_base, None)
         assert mw.on_error(ValueError("test")) is True
+
+
 """Tests for builtin middleware (REQ-MIDW-002)."""
 
 import configparser
@@ -114,10 +116,7 @@ class TestHttpConfigMiddleware:
         mw = HttpConfigMiddleware(process_base, "http_section")
 
         # return the current config as JSON
-        current = {
-            s: dict(process_base.config[s])
-            for s in process_base.config.sections()
-        }
+        current = {s: dict(process_base.config[s]) for s in process_base.config.sections()}
         current_json = json.dumps(current, sort_keys=True).encode()
 
         def mock_urlopen(*args, **kwargs):

@@ -22,7 +22,9 @@ def _run_cli(*args, env_extra=None):
         env["PYTHONPATH"] = _PKG_DIR
     return subprocess.run(
         [sys.executable, "-m", "pympacds.cli", *args],
-        capture_output=True, text=True, env=env,
+        capture_output=True,
+        text=True,
+        env=env,
     )
 
 
@@ -133,9 +135,7 @@ class TestCLINew:
             main()
             assert os.path.isdir("my_mw/src/pympacds_middleware_my_mw")
             assert os.path.isfile("my_mw/pyproject.toml")
-            assert os.path.isfile(
-                "my_mw/src/pympacds_middleware_my_mw/middleware.py"
-            )
+            assert os.path.isfile("my_mw/src/pympacds_middleware_my_mw/middleware.py")
         finally:
             os.chdir(cwd)
 
@@ -180,7 +180,11 @@ class TestCLIConfig:
         cp["myservice"] = {"name": "hello"}
         with open(cfg, "w") as f:
             cp.write(f)
-        monkeypatch.setattr(sys, "argv", ["pympacds-admin", "config", "get", "-c", str(cfg), "myservice", "name"])
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            ["pympacds-admin", "config", "get", "-c", str(cfg), "myservice", "name"],
+        )
         stdout_buf = []
 
         def capture(*a, **kw):
@@ -198,7 +202,11 @@ class TestCLIConfig:
         cp["myservice"] = {}
         with open(cfg, "w") as f:
             cp.write(f)
-        monkeypatch.setattr(sys, "argv", ["pympacds-admin", "config", "get", "-c", str(cfg), "myservice", "missing"])
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            ["pympacds-admin", "config", "get", "-c", str(cfg), "myservice", "missing"],
+        )
         from pympacds.cli import main
 
         with pytest.raises(SystemExit):
@@ -210,7 +218,20 @@ class TestCLIConfig:
         cp["myservice"] = {"name": "old"}
         with open(cfg, "w") as f:
             cp.write(f)
-        monkeypatch.setattr(sys, "argv", ["pympacds-admin", "config", "set", "-c", str(cfg), "myservice", "name", "new"])
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            [
+                "pympacds-admin",
+                "config",
+                "set",
+                "-c",
+                str(cfg),
+                "myservice",
+                "name",
+                "new",
+            ],
+        )
         from pympacds.cli import main
 
         main()
@@ -220,7 +241,11 @@ class TestCLIConfig:
 
     def test_set_new_section(self, tmp_path, monkeypatch):
         cfg = tmp_path / "test.ini"
-        monkeypatch.setattr(sys, "argv", ["pympacds-admin", "config", "set", "-c", str(cfg), "newsect", "k", "v"])
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            ["pympacds-admin", "config", "set", "-c", str(cfg), "newsect", "k", "v"],
+        )
         from pympacds.cli import main
 
         main()
@@ -234,7 +259,11 @@ class TestCLIConfig:
         cp["myservice"] = {"name": "hello", "age": "42"}
         with open(cfg, "w") as f:
             cp.write(f)
-        monkeypatch.setattr(sys, "argv", ["pympacds-admin", "config", "remove", "-c", str(cfg), "myservice", "age"])
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            ["pympacds-admin", "config", "remove", "-c", str(cfg), "myservice", "age"],
+        )
         from pympacds.cli import main
 
         main()

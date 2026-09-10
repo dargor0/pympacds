@@ -15,10 +15,13 @@ _dbus_lib: object | None = None
 _dbus_aio: object | None = None
 _dbus_service: object | None = None
 
-_import_error_msg: str = "pympacds requires a D-Bus library. "\
-                "Install either 'dbus-fast' (recommended) or 'dbus-next':\n"\
-                "    pip install dbus-fast\n"\
-                "    pip install dbus-next"
+_import_error_msg: str = (
+    "pympacds requires a D-Bus library. "
+    "Install either 'dbus-fast' (recommended) or 'dbus-next':\n"
+    "    pip install dbus-fast\n"
+    "    pip install dbus-next"
+)
+
 
 def _import_dbus() -> tuple[str, object, object, object]:
     """Import the D-Bus library in priority order.
@@ -37,7 +40,7 @@ def _import_dbus() -> tuple[str, object, object, object]:
 
     if _DBUS_BACKEND is not None:
         return _DBUS_BACKEND, _dbus_lib, _dbus_aio, _dbus_service
-        
+
     if os.environ.get("PYMPACDS_DBUS_BACKEND", "") == "dbus-fast":
         # force dbus-fast
         _try_dbus_fast_import(True)
@@ -54,7 +57,8 @@ def _import_dbus() -> tuple[str, object, object, object]:
 
     _logger.info("D-Bus backend: %s", _DBUS_BACKEND)
     return _DBUS_BACKEND, _dbus_lib, _dbus_aio, _dbus_service
-    
+
+
 def _try_dbus_fast_import(doraise: bool) -> bool:
     """Attempt to import ``dbus-fast``.
 
@@ -65,7 +69,7 @@ def _try_dbus_fast_import(doraise: bool) -> bool:
         True if the import succeeded.
     """
     global _DBUS_BACKEND, _dbus_lib, _dbus_aio, _dbus_service
-    
+
     try:
         import dbus_fast as _dbus_lib
         import dbus_fast.aio.message_bus as _dbus_aio
@@ -78,8 +82,8 @@ def _try_dbus_fast_import(doraise: bool) -> bool:
         return False
     else:
         return True
-        
-        
+
+
 def _try_dbus_next_import(doraise: bool) -> bool:
     """Attempt to import ``dbus-next``.
 
@@ -90,7 +94,7 @@ def _try_dbus_next_import(doraise: bool) -> bool:
         True if the import succeeded.
     """
     global _DBUS_BACKEND, _dbus_lib, _dbus_aio, _dbus_service
-    
+
     try:
         import dbus_next as _dbus_lib
         import dbus_next.aio.message_bus as _dbus_aio

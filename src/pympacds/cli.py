@@ -472,6 +472,32 @@ def _cmd_list(args) -> None:
     """List running pympacds services via D-Bus."""
     try:
         from . import get_dbus_aio, get_dbus_lib
+        from .introspect import BusIntrospect
+
+        async def _read_tags(bus, lib, name) -> str:
+            """Best-effort read of provides/requires tags from a service."""
+            tags = ""
+            try:
+                node = await bus.introspect(name, "/org/pympacds/health")
+                bi = BusIntrospect(node.tostring(), path="/org/pympacds/health")
+                for propname in ("provides", "requires"):
+                    found = bi.find_property(propname)
+                    if not found:
+                        continue
+                    iface = found[0][0]
+                    reply = await bus.call(
+                        lib.Message(
+                            destination=name,
+                            path="/org/pympacds/health",
+                            interface="org.freedesktop.DBus.Properties",
+                            member="Get",
+                            body=[iface, propname],
+                        )
+                    )
+                    tags += f" {propname}={list(reply.body[0].value)}"
+            except Exception:
+                pass
+            return tags.strip()
 
         async def _list():
             aio = get_dbus_aio()
@@ -504,7 +530,11 @@ def _cmd_list(args) -> None:
                             pid = pid_reply.body[0]
                         except Exception:
                             pid = "?"
-                        print(f"{name:<50} PID={pid}")
+                        line = f"{name:<50} PID={pid}"
+                        tags = await _read_tags(bus, lib, name)
+                        if tags:
+                            line += f"  {tags}"
+                        print(line)
             finally:
                 bus.disconnect()
                 await bus.wait_for_disconnect()
@@ -513,8 +543,10 @@ def _cmd_list(args) -> None:
 
         asyncio.run(_list())
     except ImportError:
-        print("No D-Bus library available. Install dbus-fast or dbus-next.",
-              file=sys.stderr)
+        print(
+            "No D-Bus library available. Install dbus-fast or dbus-next.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
 
@@ -558,21 +590,44 @@ def _validate_dbus(cp: object) -> list[str]:
     if not cp.has_section("dbus"):
         return errors
     d = cp["dbus"]
+    _check_dbus_bus_type(d, errors)
+    _check_dbus_drain_timeout(d, errors)
+    _check_dbus_contract_flags(d, errors)
+    _check_dbus_heartbeat(d, errors)
+    _check_dbus_discovery(d, errors)
+    return errors
+
+
+def _check_dbus_bus_type(d, errors: list[str]) -> None:
     bt = d.get("bus_type", "system")
     if bt not in {"system", "session"}:
         errors.append(f"dbus.bus_type: must be 'system' or 'session', got '{bt}'")
+
+
+def _check_dbus_drain_timeout(d, errors: list[str]) -> None:
     try:
         dto = d.getint("drain_timeout_ms", 2000)
         if dto < 0:
             raise ValueError
     except (ValueError, TypeError):
         errors.append("dbus.drain_timeout_ms: must be a non-negative integer")
-    for key in ("contract_health", "contract_metrics", "contract_lifecycle", "contract_config"):
+
+
+def _check_dbus_contract_flags(d, errors: list[str]) -> None:
+    for key in (
+        "contract_health",
+        "contract_metrics",
+        "contract_lifecycle",
+        "contract_config",
+    ):
         if key in d:
             try:
                 d.getboolean(key)
             except ValueError:
                 errors.append(f"dbus.{key}: must be true/false")
+
+
+def _check_dbus_heartbeat(d, errors: list[str]) -> None:
     if "heartbeat_interval_s" in d:
         try:
             hb = d.getint("heartbeat_interval_s")
@@ -580,12 +635,14 @@ def _validate_dbus(cp: object) -> list[str]:
                 raise ValueError
         except (ValueError, TypeError):
             errors.append("dbus.heartbeat_interval_s: must be an integer between 5 and 3600")
+
+
+def _check_dbus_discovery(d, errors: list[str]) -> None:
     if "discovery_enabled" in d:
         try:
             d.getboolean("discovery_enabled")
         except ValueError:
             errors.append("dbus.discovery_enabled: must be true/false")
-    return errors
 
 
 def _add_config_file_arg(parser: argparse.ArgumentParser) -> None:
@@ -606,46 +663,66 @@ def _cmd_config(args) -> None:
         cp.read(config_file)
 
     if cfg_cmd == "show":
-        for section in cp.sections():
-            print(f"[{section}]")
-            for k, v in cp[section].items():
-                print(f"  {k} = {v}")
+        _cmd_config_show(cp)
     elif cfg_cmd == "get":
-        try:
-            print(cp[args.section][args.key])
-        except KeyError:
-            print(f"Key '{args.section}.{args.key}' not found.", file=sys.stderr)
-            sys.exit(1)
+        _cmd_config_get(cp, args)
     elif cfg_cmd == "set":
-        if not config_file:
-            print("--config is required for 'set'", file=sys.stderr)
-            sys.exit(1)
-        if not cp.has_section(args.section):
-            cp.add_section(args.section)
-        cp[args.section][args.key] = args.value
-        with open(config_file, "w") as f:
-            cp.write(f)
+        _cmd_config_set(cp, args, config_file)
     elif cfg_cmd == "remove":
-        if not config_file:
-            print("--config is required for 'remove'", file=sys.stderr)
-            sys.exit(1)
-        cp.remove_option(args.section, args.key)
-        with open(config_file, "w") as f:
-            cp.write(f)
+        _cmd_config_remove(cp, args, config_file)
     elif cfg_cmd == "validate":
-        errors = _validate_builtin(cp)
-        schema = getattr(args, "schema", None)
-        if schema:
-            from .config import ConfigManager
+        _cmd_config_validate(cp, args)
 
-            cm = ConfigManager(schema_file=schema)
-            errors.extend(cm.validate(cp))
-        if errors:
-            for e in errors:
-                print(e, file=sys.stderr)
-            sys.exit(1)
-        else:
-            print("Configuration is valid.")
+
+def _cmd_config_show(cp) -> None:
+    for section in cp.sections():
+        print(f"[{section}]")
+        for k, v in cp[section].items():
+            print(f"  {k} = {v}")
+
+
+def _cmd_config_get(cp, args) -> None:
+    try:
+        print(cp[args.section][args.key])
+    except KeyError:
+        print(f"Key '{args.section}.{args.key}' not found.", file=sys.stderr)
+        sys.exit(1)
+
+
+def _cmd_config_set(cp, args, config_file: str) -> None:
+    if not config_file:
+        print("--config is required for 'set'", file=sys.stderr)
+        sys.exit(1)
+    if not cp.has_section(args.section):
+        cp.add_section(args.section)
+    cp[args.section][args.key] = args.value
+    with open(config_file, "w") as f:
+        cp.write(f)
+
+
+def _cmd_config_remove(cp, args, config_file: str) -> None:
+    if not config_file:
+        print("--config is required for 'remove'", file=sys.stderr)
+        sys.exit(1)
+    cp.remove_option(args.section, args.key)
+    with open(config_file, "w") as f:
+        cp.write(f)
+
+
+def _cmd_config_validate(cp, args) -> None:
+    errors = _validate_builtin(cp)
+    schema = getattr(args, "schema", None)
+    if schema:
+        from .config import ConfigManager
+
+        cm = ConfigManager(schema_file=schema)
+        errors.extend(cm.validate(cp))
+    if errors:
+        for e in errors:
+            print(e, file=sys.stderr)
+        sys.exit(1)
+    else:
+        print("Configuration is valid.")
 
 
 # ------------------------------------------------------------------
@@ -655,8 +732,10 @@ def _cmd_config(args) -> None:
 
 def _ensure_root() -> None:
     if os.geteuid() != 0:
-        print("pympacds-admin: error: root privileges required. Run with sudo.",
-              file=sys.stderr)
+        print(
+            "pympacds-admin: error: root privileges required. Run with sudo.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
 

@@ -7,12 +7,8 @@ import sys
 import time
 import pytest
 
-_EXAMPLES = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "examples")
-)
-_PKG_SRC = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "src")
-)
+_EXAMPLES = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "examples"))
+_PKG_SRC = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
 
 
 def _run_service(script, ini, address, extra_env=None):
@@ -67,9 +63,7 @@ class TestSensorCollector:
         time.sleep(1)
 
         # start collector
-        collector = _run_service(
-            "collector.py", str(collector_ini), session_bus_address
-        )
+        collector = _run_service("collector.py", str(collector_ini), session_bus_address)
         time.sleep(3)
 
         # stop both
@@ -80,16 +74,10 @@ class TestSensorCollector:
         sout, serr = sensor.communicate(timeout=5)
 
         assert "Collector started" in cerr, f"collector stdout: {cout}\nstderr: {cerr}"
-        assert "Subscribed to sensor" in cerr, (
-            f"stdout: {cout}\n sensor stderr: {serr}"
-        )
-        assert "Received measurement" in cerr, (
-            f"stdout: {cout}\nstderr: {cerr}"
-        )
+        assert "Subscribed to sensor" in cerr, f"stdout: {cout}\n sensor stderr: {serr}"
+        assert "Received measurement" in cerr, f"stdout: {cout}\nstderr: {cerr}"
 
-    def test_collector_notices_sensor_disconnect(
-        self, session_bus_address, tmp_path
-    ):
+    def test_collector_notices_sensor_disconnect(self, session_bus_address, tmp_path):
         """Collector detects when a sensor disappears from the bus."""
         sensor_ini = tmp_path / "sensor.ini"
         collector_ini = tmp_path / "collector.ini"
@@ -103,9 +91,7 @@ class TestSensorCollector:
         sensor = _run_service("sensor.py", str(sensor_ini), session_bus_address)
         time.sleep(1)
 
-        collector = _run_service(
-            "collector.py", str(collector_ini), session_bus_address
-        )
+        collector = _run_service("collector.py", str(collector_ini), session_bus_address)
         time.sleep(2)
 
         # kill sensor
@@ -118,6 +104,4 @@ class TestSensorCollector:
         collector.send_signal(signal.SIGTERM)
         cout, cerr = collector.communicate(timeout=5)
 
-        assert "Unsubscribed from sensor" in cerr, (
-            f"stdout: {cout}\nstderr: {cerr}"
-        )
+        assert "Unsubscribed from sensor" in cerr, f"stdout: {cout}\nstderr: {cerr}"

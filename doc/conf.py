@@ -11,10 +11,10 @@ copyright = "2026, Oscar Diaz"
 author = "Oscar Diaz <odiaz@ieee.org>"
 
 extensions = [
-    "myst_parser",               # Markdown source support
-    "sphinx.ext.autodoc",        # API docs from docstrings
-    "sphinx.ext.napoleon",       # Google-style / NumPy-style docstrings
-    "sphinx.ext.viewcode",       # links to source code
+    "myst_parser",  # Markdown source support
+    "sphinx.ext.autodoc",  # API docs from docstrings
+    "sphinx.ext.napoleon",  # Google-style / NumPy-style docstrings
+    "sphinx.ext.viewcode",  # links to source code
 ]
 
 myst_enable_extensions = [

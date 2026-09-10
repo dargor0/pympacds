@@ -6,10 +6,26 @@ import asyncio
 import json
 import logging
 import urllib.request
+from dataclasses import dataclass
 
 from .process import ProcessBase
 
 _logger = logging.getLogger(__name__)
+
+
+@dataclass
+class MiddlewareSpec:
+    """Describes a middleware to activate programmatically (REQ-SVC-015).
+
+    Attributes:
+        middleware: A ``MiddlewareBase`` subclass, or an entry-point name
+            (string) registered under the ``pympacds.middleware`` group.
+        section: The INI section name for the middleware's configuration,
+            or ``None`` if no dedicated section is used.
+    """
+
+    middleware: type | str
+    section: str | None = None
 
 
 class MiddlewareBase:
@@ -27,9 +43,7 @@ class MiddlewareBase:
     def __init__(self, service: ProcessBase, section: str | None):
         self.service = service
         self.section = section
-        self.logger = service.logger.getChild(
-            self.__class__.__name__.lower()
-        )
+        self.logger = service.logger.getChild(self.__class__.__name__.lower())
         if section is not None and service.config.has_section(section):
             self._config = service.config[section]
         else:
@@ -94,7 +108,9 @@ class HttpConfigMiddleware(MiddlewareBase):
 
         timeout = int(self._config.get("timeout_s", 10))
         tls_verify = self._config.get("tls_verify", "true").lower() in (
-            "true", "1", "yes"
+            "true",
+            "1",
+            "yes",
         )
 
         try:
@@ -106,6 +122,7 @@ class HttpConfigMiddleware(MiddlewareBase):
                 ctx = None
                 if not tls_verify:
                     import ssl
+
                     ctx = ssl.create_default_context()
                     ctx.check_hostname = False
                     ctx.verify_mode = ssl.CERT_NONE
@@ -141,7 +158,5 @@ class HttpConfigMiddleware(MiddlewareBase):
         with open(self.service.args.configfile, "w") as f:
             cp.write(f)
 
-        self.logger.info(
-            "httpconfprov: config updated from %s, restarting", url
-        )
+        self.logger.info("httpconfprov: config updated from %s, restarting", url)
         self.service.exitevent.set()

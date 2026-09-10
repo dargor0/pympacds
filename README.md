@@ -94,9 +94,7 @@ class MyService(ProcessBase):
 
     def update_tasks(self):
         if "periodic" not in self.tasklist:
-            self.tasklist["periodic"] = asyncio.create_task(
-                self._periodic(), name="periodic"
-            )
+            self.tasklist["periodic"] = asyncio.create_task(self._periodic(), name="periodic")
 
     def dbus_my_method(self, arg: str) -> str:
         return f"Got: {arg}"

@@ -8,7 +8,8 @@ class TestServiceContract:
         from pympacds.contracts import ServiceContract
 
         class MockBase:
-            def dbus_ping(self): pass
+            def dbus_ping(self):
+                pass
 
         class MyContract(ServiceContract):
             iface_name = "My"
@@ -28,6 +29,7 @@ class TestServiceContract:
             pass
 
         with pytest.raises(AttributeError, match="requires method"):
+
             class BadContract(ServiceContract):
                 def __init__(self, ifname, base):
                     super().__init__(ifname, base)
@@ -42,6 +44,7 @@ class TestServiceContract:
             not_a_method = 42
 
         with pytest.raises(AttributeError, match="requires callable"):
+
             class BadContract(ServiceContract):
                 def __init__(self, ifname, base):
                     super().__init__(ifname, base)
@@ -55,12 +58,14 @@ class TestServiceContract:
         class MyContract(ServiceContract):
             iface_name = "My"
             iface_version = "2.0.0"
-            contract_type = "health"
+            iface_provides = ["health"]
+            iface_requires = ["network"]
 
         meta = MyContract._get_contract_metadata()
         assert meta["iface_name"] == "My"
         assert meta["iface_version"] == "2.0.0"
-        assert meta["contract_type"] == "health"
+        assert meta["provides"] == ["health"]
+        assert meta["requires"] == ["network"]
 
     def test_inherits_from_library_service_interface(self):
         from pympacds.contracts import ServiceContract
@@ -85,6 +90,8 @@ class TestDecorators:
         from pympacds.contracts import dbus_property
 
         assert callable(dbus_property)
+
+
 """Additional tests for contracts decorators."""
 
 import asyncio
@@ -145,6 +152,8 @@ class TestDBusPropertyDecorator:
 
         pt = PropTest()
         assert pt.value == 42
+
+
 """Tests for built-in contracts (REQ-XCUT-004).
 
 Contract methods are dispatched by the D-Bus library's message bus,
@@ -157,32 +166,57 @@ import pytest
 
 class MockService:
     """Minimal mock implementing all contract callbacks."""
-    def dbus_health_ping(self): return True
-    def dbus_health_status(self): return '{"ok":true}'
-    def dbus_health_get_uptime(self): return 42
-    def dbus_lifecycle_restart(self): return True
-    def dbus_lifecycle_shutdown(self): return True
-    def dbus_config_get(self, s, k): return "val"
-    def dbus_config_set(self, s, k, v): return True
-    def dbus_metrics_get(self): return '{}'
+
+    def dbus_health_ping(self):
+        return True
+
+    def dbus_health_status(self):
+        return '{"ok":true}'
+
+    def dbus_health_get_uptime(self):
+        return 42
+
+    def dbus_health_get_provides(self):
+        return ["health"]
+
+    def dbus_health_get_requires(self):
+        return []
+
+    def dbus_lifecycle_restart(self):
+        return True
+
+    def dbus_lifecycle_shutdown(self):
+        return True
+
+    def dbus_config_get(self, s, k):
+        return "val"
+
+    def dbus_config_set(self, s, k, v):
+        return True
+
+    def dbus_metrics_get(self):
+        return "{}"
 
 
 class TestHealthContract:
     def test_construction(self):
         from pympacds.builtin_contracts import HealthContract
+
         hc = HealthContract("com.example.Health", MockService())
         assert hc.iface_name == "Health"
         assert hc.iface_version == "1.0.0"
-        assert hc.contract_type == "health"
+        assert hc.iface_provides == ["health"]
 
     def test_uptime_property_readable(self):
         from pympacds.builtin_contracts import HealthContract
+
         svc = MockService()
         hc = HealthContract("com.example.Health", svc)
         assert getattr(hc, "uptime") == 42
 
     def test_missing_callback_raises(self):
         from pympacds.builtin_contracts import HealthContract
+
         with pytest.raises(AttributeError, match="requires method"):
             HealthContract("x", object())
 
@@ -190,22 +224,55 @@ class TestHealthContract:
 class TestLifecycleContract:
     def test_construction(self):
         from pympacds.builtin_contracts import LifecycleContract
+
         lc = LifecycleContract("com.example.Life", MockService())
         assert lc.iface_name == "Lifecycle"
-        assert lc.contract_type == "lifecycle"
+        assert lc.iface_provides == ["lifecycle"]
 
 
 class TestConfigContract:
     def test_construction(self):
         from pympacds.builtin_contracts import ConfigContract
+
         cc = ConfigContract("com.example.Config", MockService())
         assert cc.iface_name == "Config"
-        assert cc.contract_type == "config"
+        assert cc.iface_provides == ["config"]
 
 
 class TestMetricsContract:
     def test_construction(self):
         from pympacds.builtin_contracts import MetricsContract
+
         mc = MetricsContract("com.example.Metrics", MockService())
         assert mc.iface_name == "Metrics"
-        assert mc.contract_type == "metrics"
+        assert mc.iface_provides == ["metrics"]
+
+
+class TestContractCapabilityTags:
+    """The capability-tag class attributes must remain plain lists
+    (REQ-SVC-014). They are named ``iface_provides``/``iface_requires`` to avoid
+    colliding with the ``provides``/``requires`` ``@dbus_property`` members on
+    ``HealthContract``."""
+
+    def test_provides_and_requires_are_lists(self):
+        from pympacds.builtin_contracts import (
+            HealthContract,
+            LifecycleContract,
+            ConfigContract,
+            MetricsContract,
+        )
+
+        for cls in (
+            HealthContract,
+            LifecycleContract,
+            ConfigContract,
+            MetricsContract,
+        ):
+            assert isinstance(cls.iface_provides, list), (
+                f"{cls.__name__}.iface_provides is not a list "
+                f"(got {type(cls.iface_provides).__name__})"
+            )
+            assert isinstance(cls.iface_requires, list), (
+                f"{cls.__name__}.iface_requires is not a list "
+                f"(got {type(cls.iface_requires).__name__})"
+            )

@@ -32,7 +32,7 @@ pympacds-admin = "pympacds.cli:main"
 [project.optional-dependencies]
 dbus-fast = ["dbus-fast>=4.0"]
 dbus-next = ["dbus-next>=0.2"]
-dev = ["pytest", "pytest-asyncio", "mypy", "ruff"]
+dev = ["pytest", "pytest-asyncio", "pytest-cov", "mypy", "ruff", "lizard"]
 docs = ["sphinx>=7.0", "myst-parser>=2.0", "furo>=2023.9.10"]
 
 [project.entry-points."pympacds.middleware"]
@@ -48,9 +48,38 @@ pythonpath = ["src"]
 addopts = [
     "-v",
     "--tb=short",
+    "--cov=pympacds",
+    "--cov-report=term-missing",
 ]
 filterwarnings = [
     # Third-party deprecation from PyGObject (triggered by the D-Bus library's
     # GLib backend import); pympacds uses asyncio and does not use GLib.
     "ignore:GLib.unix_signal_add_full is deprecated.*:gi.PyGIDeprecationWarning",
 ]
+
+[tool.coverage.run]
+branch = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+
+# D-Bus type-signature string annotations ("s", "b", "as", ...) are the
+# dbus-fast/dbus-next convention, not Python type references.
+[tool.ruff.lint.per-file-ignores]
+"src/pympacds/builtin_contracts.py" = ["F821", "F722"]
+"examples/*.py" = ["F821", "F722"]
+"tests/*.py" = ["F821", "F722"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+
+# D-Bus type-signature annotations ("s", "b", "as", ...) are the dbus-fast/dbus-next
+# convention, not Python types; mypy tries to resolve them as forward references.
+[[tool.mypy.overrides]]
+module = "pympacds.builtin_contracts"
+disable_error_code = ["name-defined", "valid-type"]
