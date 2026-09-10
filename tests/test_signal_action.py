@@ -203,13 +203,25 @@ class TestRuleParsing:
         mw, _ = make_mw({"r1": "not json {"})
         assert mw._fatal is not None
 
-    def test_empty_section_fatal(self):
+    def test_empty_section_not_fatal_at_init(self):
         mw, _ = make_mw({})
-        assert mw._fatal is not None
+        assert mw._fatal is None  # rules may be added in code (REQ-MIDW-016)
 
-    def test_missing_section_fatal(self):
+    def test_missing_section_not_fatal_at_init(self):
         mw, _ = make_mw(None)
-        assert mw._fatal is not None
+        assert mw._fatal is None
+
+    @pytest.mark.asyncio
+    async def test_empty_section_no_rules_raises_on_setup(self):
+        mw, _ = make_mw({})
+        with pytest.raises(RuntimeError):
+            await mw.setup()
+
+    @pytest.mark.asyncio
+    async def test_missing_section_no_rules_raises_on_setup(self):
+        mw, _ = make_mw(None)
+        with pytest.raises(RuntimeError):
+            await mw.setup()
 
     @pytest.mark.asyncio
     async def test_fatal_raises_on_setup(self):
@@ -487,3 +499,129 @@ class TestExport:
             assert isinstance(iface, SignalActionContract)
         finally:
             await mw.teardown()
+
+
+class TestProgrammaticRegistration:
+    def _bus(self):
+        bus = FakeBus()
+        bus.friendbus = {"org.pympacds.gpio", "org.pympacds.mqtt"}
+        bus.tags = {
+            "org.pympacds.gpio": {"provides": ["gpio"]},
+            "org.pympacds.mqtt": {"provides": ["mqtt"]},
+        }
+        bus.trees = {
+            "org.pympacds.gpio": {"/org/pympacds/gpio": node("/org/pympacds/gpio", GPIO_XML)},
+            "org.pympacds.mqtt": {"/org/pympacds/mqtt": node("/org/pympacds/mqtt", MQTT_XML)},
+        }
+        return bus
+
+    @pytest.mark.asyncio
+    async def test_register_valid_rule(self):
+        bus = self._bus()
+        mw, _ = make_mw(None, bus)
+        ok = await mw.register_rule("gpio_to_mqtt", "@gpio:line_changed", "@mqtt:publish")
+        assert ok is True
+        rule = mw._rules["gpio_to_mqtt"]
+        assert rule.persistent is True
+        assert rule.notify is False
+        assert rule.argmap is None
+        assert rule.queue_size == 1000
+
+    @pytest.mark.asyncio
+    async def test_register_invalid_trigger(self):
+        bus = self._bus()
+        mw, _ = make_mw(None, bus)
+        ok = await mw.register_rule("bad", "not-a-valid-spec", "@mqtt:publish")
+        assert ok is False
+        assert "bad" not in mw._rules
+
+    @pytest.mark.asyncio
+    async def test_register_tag_action_without_method(self):
+        bus = self._bus()
+        mw, _ = make_mw(None, bus)
+        ok = await mw.register_rule("bad", "@gpio:line_changed", "@mqtt")
+        assert ok is False
+        assert "bad" not in mw._rules
+
+    @pytest.mark.asyncio
+    async def test_register_unresolvable_trigger_persistent_fails(self):
+        bus = FakeBus()  # empty friend set
+        mw, _ = make_mw(None, bus)
+        ok = await mw.register_rule("r", "@gpio:line_changed", "@mqtt:publish", persistent=True)
+        assert ok is False
+        assert "r" not in mw._rules
+
+    @pytest.mark.asyncio
+    async def test_register_unresolvable_action_fails(self):
+        bus = FakeBus()
+        bus.friendbus = {"org.pympacds.gpio"}
+        bus.tags = {"org.pympacds.gpio": {"provides": ["gpio"]}}
+        bus.trees = {"org.pympacds.gpio": {"/org/pympacds/gpio": node("/org/pympacds/gpio", GPIO_XML)}}
+        mw, _ = make_mw(None, bus)
+        ok = await mw.register_rule("r", "@gpio:line_changed", "@mqtt:publish")
+        assert ok is False  # no mqtt friend -> action not resolvable
+        assert "r" not in mw._rules
+
+    @pytest.mark.asyncio
+    async def test_register_name_collision(self):
+        bus = self._bus()
+        mw, _ = make_mw(
+            {"r": json.dumps({"trigger": "@gpio:line_changed", "action": "@mqtt:publish"})},
+            bus,
+        )
+        ok = await mw.register_rule("r", "@gpio:line_changed", "@mqtt:publish")
+        assert ok is False
+
+    @pytest.mark.asyncio
+    async def test_register_before_setup_is_staged_then_armed(self):
+        bus = self._bus()
+        mw, _ = make_mw(None, bus)
+        ok = await mw.register_rule("r", "@gpio:line_changed", "@mqtt:publish")
+        assert ok is True
+        assert mw._rules["r"].queue is None  # not yet armed
+        await mw.setup()
+        try:
+            assert mw._setup_done is True
+            assert mw._rules["r"].active is True
+            assert len(mw._rules["r"].subscriptions) == 1
+        finally:
+            await mw.teardown()
+
+    @pytest.mark.asyncio
+    async def test_register_after_setup_arms_immediately(self):
+        bus = self._bus()
+        mw, _ = make_mw(
+            {"seed": json.dumps({"trigger": "@gpio:line_changed", "action": "@mqtt:publish"})},
+            bus,
+        )
+        await mw.setup()
+        try:
+            ok = await mw.register_rule("runtime", "@gpio:line_changed", "@mqtt:publish")
+            assert ok is True
+            rule = mw._rules["runtime"]
+            assert rule.queue is not None
+            assert rule.active is True
+        finally:
+            await mw.teardown()
+
+    @pytest.mark.asyncio
+    async def test_remove_rule(self):
+        bus = self._bus()
+        mw, _ = make_mw(
+            {"r": json.dumps({"trigger": "@gpio:line_changed", "action": "@mqtt:publish"})},
+            bus,
+        )
+        await mw.setup()
+        try:
+            assert "r" in mw._rules
+            ok = await mw.remove_rule("r")
+            assert ok is True
+            assert "r" not in mw._rules
+        finally:
+            await mw.teardown()
+
+    @pytest.mark.asyncio
+    async def test_remove_unknown_rule(self):
+        bus = self._bus()
+        mw, _ = make_mw(None, bus)
+        assert await mw.remove_rule("nope") is False

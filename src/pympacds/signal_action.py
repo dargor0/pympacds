@@ -178,6 +178,7 @@ class SignalActionMiddleware(MiddlewareBase):
         self._contract = None
         self._dispatcher_tasks: dict[str, asyncio.Task] = {}
         self._rearm_task: asyncio.Task | None = None
+        self._setup_done: bool = False
         self._parse_rules()
 
     # -- rule parsing --------------------------------------------------
@@ -190,10 +191,9 @@ class SignalActionMiddleware(MiddlewareBase):
 
     def _parse_rules(self) -> None:
         items = list(self._iter_rule_items())
-        if not items:
-            self._fatal = "signal_action: no rules configured (missing or empty section)"
-            return
-
+        # An empty/missing section is NOT fatal here: rules may also be
+        # registered in code (REQ-MIDW-016).  The "no rules at all" case is
+        # checked in setup() after programmatic rules have been staged.
         for name, raw in items:
             try:
                 data = json.loads(raw)
@@ -208,6 +208,18 @@ class SignalActionMiddleware(MiddlewareBase):
             rule = self._build_rule(name, data)
             if rule is not None:
                 self._rules[name] = rule
+
+    @staticmethod
+    def _parse_argmap(raw) -> "tuple[bool, list | None]":
+        """Normalize an ``argmap`` value; returns ``(ok, argmap_list)``."""
+        if raw is None:
+            return True, None
+        if isinstance(raw, str):
+            try:
+                return True, json.loads(raw)
+            except (json.JSONDecodeError, TypeError):
+                return False, None
+        return True, list(raw)
 
     def _build_rule(self, name: str, data: dict) -> Rule | None:
         trigger_raw = data.get("trigger")
@@ -237,19 +249,12 @@ class SignalActionMiddleware(MiddlewareBase):
             )
             return None
 
-        argmap_raw = data.get("argmap")
-        if argmap_raw is None:
-            argmap = None
-        elif isinstance(argmap_raw, str):
-            try:
-                argmap = json.loads(argmap_raw)
-            except (json.JSONDecodeError, TypeError):
-                self.logger.warning(
-                    "signal_action: rule '%s' has invalid argmap; disabled", name
-                )
-                return None
-        else:
-            argmap = list(argmap_raw)
+        ok, argmap = self._parse_argmap(data.get("argmap"))
+        if not ok:
+            self.logger.warning(
+                "signal_action: rule '%s' has invalid argmap; disabled", name
+            )
+            return None
 
         try:
             queue_size = max(1, int(data.get("queue_size", 1000)))
@@ -271,6 +276,10 @@ class SignalActionMiddleware(MiddlewareBase):
     async def setup(self) -> None:
         if self._fatal:
             raise RuntimeError(self._fatal)
+        if not self._rules:
+            raise RuntimeError(
+                "signal_action: no rules configured (missing or empty section)"
+            )
 
         self._export_contract()
 
@@ -285,6 +294,8 @@ class SignalActionMiddleware(MiddlewareBase):
             self._rearm_task = asyncio.create_task(
                 self._rearm_loop(), name="signal_action:rearm"
             )
+
+        self._setup_done = True
 
     async def teardown(self) -> None:
         if self._rearm_task is not None:
@@ -302,6 +313,128 @@ class SignalActionMiddleware(MiddlewareBase):
         except Exception as exc:
             self.logger.warning("signal_action: could not export contract: %s", exc)
             self._contract = None
+
+    # -- programmatic rule registration (REQ-MIDW-016) -----------------
+
+    async def register_rule(
+        self,
+        name: str,
+        trigger: str,
+        action: str,
+        *,
+        persistent: bool = True,
+        notify: bool = False,
+        argmap: str | None = None,
+        queue_size: int = 1000,
+    ) -> bool:
+        """Register a rule from code.  Strict registration-time validation.
+
+        Both ``trigger`` and ``action`` must parse **and** resolve at this
+        moment, otherwise the call fails (``False``) even with
+        ``persistent: true``.  Returns ``True`` on success.
+        """
+        if name in self._rules:
+            self.logger.warning("signal_action: register_rule '%s': name already in use", name)
+            return False
+
+        rule = self._build_programmatic_rule(
+            name, trigger, action, persistent, notify, argmap, queue_size
+        )
+        if rule is None:
+            return False
+        if not await self._resolve_rule(rule):
+            return False
+
+        self._rules[name] = rule
+        if self._setup_done:
+            await self._arm_registered_rule(rule)
+
+        self.logger.info("signal_action: rule '%s' registered", name)
+        return True
+
+    def _build_programmatic_rule(
+        self, name, trigger, action, persistent, notify, argmap, queue_size
+    ) -> "Rule | None":
+        """Parse and validate programmatic rule fields; ``None`` on invalid."""
+        trigger_spec = _parse_trigger(trigger)
+        if trigger_spec is None:
+            self.logger.warning(
+                "signal_action: register_rule '%s': invalid trigger '%s'", name, trigger
+            )
+            return None
+        action_spec = _parse_action(action)
+        if action_spec is None:
+            self.logger.warning(
+                "signal_action: register_rule '%s': invalid action '%s'", name, action
+            )
+            return None
+        ok, argmap_list = self._parse_argmap(argmap)
+        if not ok:
+            self.logger.warning("signal_action: register_rule '%s': invalid argmap", name)
+            return None
+        try:
+            queue_size = max(1, int(queue_size))
+        except (TypeError, ValueError):
+            queue_size = 1000
+        return Rule(
+            name=name,
+            trigger=trigger_spec,
+            action=action_spec,
+            persistent=bool(persistent),
+            notify=bool(notify),
+            argmap=argmap_list,
+            queue_size=queue_size,
+        )
+
+    async def _resolve_rule(self, rule: Rule) -> bool:
+        """True if both the trigger and action resolve at this moment."""
+        try:
+            sources = await self._resolve_trigger_sources(rule)
+        except Exception:
+            sources = []
+        if not sources:
+            self.logger.warning(
+                "signal_action: register_rule '%s': trigger not resolvable", rule.name
+            )
+            return False
+        try:
+            targets = await self._resolve_action_targets(rule)
+        except Exception:
+            targets = []
+        if not targets:
+            self.logger.warning(
+                "signal_action: register_rule '%s': action not resolvable", rule.name
+            )
+            return False
+        return True
+
+    async def _arm_registered_rule(self, rule: Rule) -> None:
+        """Create the dispatcher and arm a rule added after ``setup()``."""
+        rule.queue = asyncio.Queue(maxsize=rule.queue_size)
+        task = asyncio.create_task(self._dispatch_loop(rule), name=f"signal_action:{rule.name}")
+        self._dispatcher_tasks[rule.name] = task
+        await self._arm_rule(rule)
+        if rule.persistent and self._rearm_task is None:
+            self._rearm_task = asyncio.create_task(
+                self._rearm_loop(), name="signal_action:rearm"
+            )
+
+    async def remove_rule(self, name: str) -> bool:
+        """Remove a rule, unsubscribing and cancelling its dispatcher."""
+        rule = self._rules.pop(name, None)
+        if rule is None:
+            return False
+        for sub in rule.subscriptions:
+            self._unsubscribe_one(sub)
+        rule.subscriptions.clear()
+        task = self._dispatcher_tasks.pop(name, None)
+        if task is not None:
+            task.cancel()
+        if rule.active:
+            rule.active = False
+            self._emit_rule_status(rule, False)
+        self.logger.info("signal_action: rule '%s' removed", name)
+        return True
 
     # -- discovery helpers ---------------------------------------------
 
