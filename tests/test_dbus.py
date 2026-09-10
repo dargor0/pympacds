@@ -25,6 +25,13 @@ class _FakeProxy:
         return "proxy:" + ifname
 
 
+class _FakeIface:
+    """Stand-in for a service interface (needs a ``name`` for logging)."""
+
+    def __init__(self, name):
+        self.name = name
+
+
 class FakeDBusIf:
     """Mock of the org.freedesktop.DBus proxy used by update_friendbus."""
 
@@ -315,3 +322,127 @@ class TestSignalHandlers:
         assert mgr.friendbus == set()
         assert "org.pympacds.test.svc" not in mgr._introspect_cache
         assert ("org.pympacds.test.svc", "/p") not in mgr._proxy_cache
+
+
+class _ExportBus:
+    """Fake bus that records ``export`` calls."""
+
+    def __init__(self):
+        self.exports = []
+
+    def export(self, path, interface):
+        self.exports.append((path, interface))
+
+
+class TestStartedFlag:
+    def test_add_interface_not_exported_before_start(self):
+        mgr = _make_manager()
+        fb = _ExportBus()
+        mgr.bus = fb
+        mgr.add_interface("svc", _FakeIface("iface1"))
+        assert fb.exports == []
+
+    def test_add_interface_exported_after_start(self):
+        mgr = _make_manager()
+        fb = _ExportBus()
+        mgr.bus = fb
+        mgr._started = True
+        iface = _FakeIface("iface1")
+        mgr.add_interface("svc", iface)
+        assert fb.exports == [(f"{mgr._obj_root}/svc", iface)]
+
+    @pytest.mark.asyncio
+    async def test_start_sets_started_flag(self):
+        mgr = _make_manager()
+
+        class Bus(_ExportBus):
+            def __init__(self):
+                super().__init__()
+                self.connected = False
+
+            async def connect(self):
+                self.connected = True
+
+            async def request_name(self, name, flags):
+                self.requested = (name, flags)
+
+        fb = Bus()
+        mgr.bus = fb
+        mgr.add_interface("svc", _FakeIface("iface1"))
+        assert mgr._started is False
+        await mgr.start()
+        assert mgr._started is True
+        assert fb.connected is True
+        assert len(fb.exports) == 1
+
+
+class TestGetFriendTags:
+    HEALTH_XML = (
+        "<node><interface name=\"org.pympacds.Health\">"
+        "<property name=\"provides\" type=\"as\" access=\"read\"/>"
+        "</interface></node>"
+    )
+
+    class _Bus:
+        def __init__(self, xml=None, tags=None, fail_introspect=False, fail_call=False):
+            self.xml = xml
+            self.tags = tags
+            self.fail_introspect = fail_introspect
+            self.fail_call = fail_call
+            self.introspect_calls = []
+            self.call_calls = []
+
+        async def introspect(self, busname, pathname):
+            self.introspect_calls.append((busname, pathname))
+            if self.fail_introspect:
+                raise RuntimeError("no health contract")
+            return _FakeNode(self.xml)
+
+        async def call(self, message):
+            self.call_calls.append(message)
+            if self.fail_call:
+                raise RuntimeError("no bus")
+
+            class Variant:
+                value = self.tags
+
+            class Reply:
+                body = [Variant()]
+
+            return Reply()
+
+    @pytest.mark.asyncio
+    async def test_returns_provides_tags(self):
+        mgr = _make_manager()
+        mgr._obj_root = "/org/pympacds"
+        mgr.bus = self._Bus(xml=self.HEALTH_XML, tags=["gpio", "http"])
+
+        tags = await mgr.get_friend_tags("org.pympacds.gpio", "provides")
+
+        assert tags == ["gpio", "http"]
+        assert mgr.bus.call_calls[0].kwargs["destination"] == "org.pympacds.gpio"
+        assert mgr.bus.call_calls[0].kwargs["path"] == "/org/pympacds/health"
+        assert mgr.bus.call_calls[0].kwargs["member"] == "Get"
+
+    @pytest.mark.asyncio
+    async def test_introspect_failure_returns_empty(self):
+        mgr = _make_manager()
+        mgr.bus = self._Bus(fail_introspect=True)
+
+        assert await mgr.get_friend_tags("org.pympacds.gpio", "provides") == []
+
+    @pytest.mark.asyncio
+    async def test_missing_property_returns_empty(self):
+        mgr = _make_manager()
+        xml = '<node><interface name="org.pympacds.Health"/></node>'
+        mgr.bus = self._Bus(xml=xml, tags=[])
+
+        assert await mgr.get_friend_tags("org.pympacds.gpio", "requires") == []
+        assert mgr.bus.call_calls == []
+
+    @pytest.mark.asyncio
+    async def test_call_failure_returns_empty(self):
+        mgr = _make_manager()
+        mgr.bus = self._Bus(xml=self.HEALTH_XML, fail_call=True)
+
+        assert await mgr.get_friend_tags("org.pympacds.gpio", "provides") == []

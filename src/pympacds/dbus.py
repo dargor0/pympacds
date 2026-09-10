@@ -67,6 +67,7 @@ class DBusManager:
         self.bus: object = self._aio.MessageBus(bus_type=self._bus_type)
         self._dbusif: object | None = None
         self._obj_root: str = _prefix_to_path(self._bus_prefix)
+        self._started: bool = False
 
         # per-friend caches (REQ-DBUS-013): introspection snapshots and proxies
         self._introspect_cache: dict[str, dict[str, BusIntrospect]] = {}
@@ -91,6 +92,8 @@ class DBusManager:
         if full_path not in self.ifacelist:
             self.ifacelist[full_path] = []
         self.ifacelist[full_path].append(iface)
+        if self._started:
+            self.bus.export(path=full_path, interface=iface)
         self.logger.debug(
             "DBus (%s) added interface %s to path %s.",
             self.busname,
@@ -115,6 +118,7 @@ class DBusManager:
         for pname, ifacelist in self.ifacelist.items():
             for iface in ifacelist:
                 self.bus.export(path=pname, interface=iface)
+        self._started = True
         if self._discovery_enabled:
             await self.update_friendbus()
         self.logger.debug("DBus (%s) started.", self.busname)
@@ -274,6 +278,37 @@ class DBusManager:
         """Await until the friend set changes."""
         self.friendchanges.clear()
         await self.friendchanges.wait()
+
+    async def get_friend_tags(self, busname: str, kind: str = "provides") -> list[str]:
+        """Read a friend service's capability tags (``provides``/``requires``).
+
+        The tags are read from the friend's ``Health`` contract property at
+        ``{root}/health`` (REQ-SVC-014).  Returns ``[]`` if the friend does not
+        export the Health contract or the property cannot be read.
+        """
+        lib = self._lib
+        health_path = self._obj_root + "/health"
+        try:
+            bi = await self.introspect(busname, health_path)
+        except Exception:
+            return []
+        found = bi.find_property(kind)
+        if not found:
+            return []
+        iface = found[0][0]
+        try:
+            reply = await self.bus.call(
+                lib.Message(
+                    destination=busname,
+                    path=health_path,
+                    interface="org.freedesktop.DBus.Properties",
+                    member="Get",
+                    body=[iface, kind],
+                )
+            )
+            return list(reply.body[0].value)
+        except Exception:
+            return []
 
     # ------------------------------------------------------------------
     # internal: D-Bus daemon proxy

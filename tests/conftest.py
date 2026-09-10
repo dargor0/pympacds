@@ -68,6 +68,10 @@ def fake_dbus_backend(monkeypatch):
         class NameFlag:
             REPLACE_EXISTING = 1
 
+        class Message:
+            def __init__(self, **kwargs):
+                self.kwargs = kwargs
+
     class FakeMessageBus:
         def __init__(self, bus_type=None, **kwargs):
             self.bus_type = bus_type
