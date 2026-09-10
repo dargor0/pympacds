@@ -1,0 +1,6 @@
+pympacds-mqtt (0.1.1-1) unstable; urgency=medium
+
+  * Initial Debian packaging.
+  * MQTT client service with paho-mqtt behind an asyncio shim.
+
+ -- Oscar Diaz <odiaz@ieee.org>  Wed, 10 Sep 2026 00:00:00 -0500

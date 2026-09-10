@@ -1,0 +1,14 @@
+[Unit]
+Description=pympacds MQTT client service
+After=dbus.service network-online.target
+Requires=dbus.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/pympacds-mqtt -c /etc/pympacds/mqtt.ini
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
