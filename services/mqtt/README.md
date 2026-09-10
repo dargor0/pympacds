@@ -1,6 +1,6 @@
 # pympacds-mqtt
 
-MQTT client service for [pympacds](https://github.com/example/pympacds). Maintains
+MQTT client service for [pympacds](https://github.com/dargor0/pympacds). Maintains
 a single MQTT connection to a broker and exposes publish/subscribe over D-Bus,
 with automatic reconnection.
 
