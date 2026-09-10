@@ -199,35 +199,29 @@ class TestRuleParsing:
         mw, _ = make_mw({"r1": json.dumps({"trigger": "@gpio:line_changed", "action": "@mqtt"})})
         assert "r1" not in mw._rules
 
-    def test_invalid_json_fatal(self):
+    def test_invalid_json_skipped(self):
         mw, _ = make_mw({"r1": "not json {"})
-        assert mw._fatal is not None
+        assert "r1" not in mw._rules  # non-fatal: skipped
 
-    def test_empty_section_not_fatal_at_init(self):
+    def test_empty_section_no_rules(self):
         mw, _ = make_mw({})
-        assert mw._fatal is None  # rules may be added in code (REQ-MIDW-016)
+        assert mw._rules == {}  # non-fatal: rules may be added in code (REQ-MIDW-016)
 
-    def test_missing_section_not_fatal_at_init(self):
+    def test_missing_section_no_rules(self):
         mw, _ = make_mw(None)
-        assert mw._fatal is None
+        assert mw._rules == {}
 
     @pytest.mark.asyncio
-    async def test_empty_section_no_rules_raises_on_setup(self):
-        mw, _ = make_mw({})
-        with pytest.raises(RuntimeError):
-            await mw.setup()
-
-    @pytest.mark.asyncio
-    async def test_missing_section_no_rules_raises_on_setup(self):
+    async def test_setup_with_no_rules_succeeds(self):
         mw, _ = make_mw(None)
-        with pytest.raises(RuntimeError):
-            await mw.setup()
+        await mw.setup()  # non-fatal: starts empty and waits for register_rule()
+        assert mw._rules == {}
 
     @pytest.mark.asyncio
-    async def test_fatal_raises_on_setup(self):
+    async def test_setup_with_invalid_json_succeeds(self):
         mw, _ = make_mw({"r1": "bad json"})
-        with pytest.raises(RuntimeError):
-            await mw.setup()
+        await mw.setup()  # non-fatal
+        assert mw._rules == {}
 
 
 # ----------------------------------------------------------------------

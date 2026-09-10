@@ -174,7 +174,6 @@ class SignalActionMiddleware(MiddlewareBase):
     def __init__(self, service, section):
         super().__init__(service, section)
         self._rules: dict[str, Rule] = {}
-        self._fatal: str | None = None
         self._contract = None
         self._dispatcher_tasks: dict[str, asyncio.Task] = {}
         self._rearm_task: asyncio.Task | None = None
@@ -191,15 +190,17 @@ class SignalActionMiddleware(MiddlewareBase):
 
     def _parse_rules(self) -> None:
         items = list(self._iter_rule_items())
-        # An empty/missing section is NOT fatal here: rules may also be
-        # registered in code (REQ-MIDW-016).  The "no rules at all" case is
-        # checked in setup() after programmatic rules have been staged.
+        # All rule errors are non-fatal (REQ-MIDW-005): a broken or empty rule
+        # set never aborts startup.  Rules may also be registered in code
+        # (REQ-MIDW-016).
         for name, raw in items:
             try:
                 data = json.loads(raw)
             except (json.JSONDecodeError, TypeError) as exc:
-                self._fatal = f"signal_action: rule '{name}' is not valid JSON: {exc}"
-                return
+                self.logger.warning(
+                    "signal_action: rule '%s' is not valid JSON: %s; skipped", name, exc
+                )
+                continue
             if not isinstance(data, dict):
                 self.logger.warning(
                     "signal_action: rule '%s' must be a JSON object; disabled", name
@@ -274,13 +275,6 @@ class SignalActionMiddleware(MiddlewareBase):
     # -- lifecycle -----------------------------------------------------
 
     async def setup(self) -> None:
-        if self._fatal:
-            raise RuntimeError(self._fatal)
-        if not self._rules:
-            raise RuntimeError(
-                "signal_action: no rules configured (missing or empty section)"
-            )
-
         self._export_contract()
 
         for name, rule in self._rules.items():

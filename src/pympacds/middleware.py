@@ -106,7 +106,11 @@ class HttpConfigMiddleware(MiddlewareBase):
         # substitute %s with service name
         url = url.replace("%s", self.service.name)
 
-        timeout = int(self._config.get("timeout_s", 10))
+        try:
+            timeout = int(self._config.get("timeout_s", 10))
+        except (TypeError, ValueError):
+            self.logger.warning("httpconfprov: invalid 'timeout_s', using default 10")
+            timeout = 10
         tls_verify = self._config.get("tls_verify", "true").lower() in (
             "true",
             "1",
@@ -138,25 +142,29 @@ class HttpConfigMiddleware(MiddlewareBase):
             # continue despite failure
             return
 
-        # compare with current config
-        current_json = json.dumps(
-            {s: dict(self.service.config[s]) for s in self.service.config.sections()},
-            sort_keys=True,
-        )
-        remote_json = json.dumps(remote, sort_keys=True)
+        # compare with current config and write if changed (never fatal)
+        try:
+            current_json = json.dumps(
+                {s: dict(self.service.config[s]) for s in self.service.config.sections()},
+                sort_keys=True,
+            )
+            remote_json = json.dumps(remote, sort_keys=True)
 
-        if current_json == remote_json:
-            self.logger.debug("httpconfprov: config unchanged")
+            if current_json == remote_json:
+                self.logger.debug("httpconfprov: config unchanged")
+                return
+
+            # write new config
+            import configparser
+
+            cp = configparser.ConfigParser()
+            for section, items in remote.items():
+                cp[section] = items
+            with open(self.service.args.configfile, "w") as f:
+                cp.write(f)
+        except Exception as exc:
+            self.logger.warning("httpconfprov: applying config failed: %s", exc)
             return
-
-        # write new config
-        import configparser
-
-        cp = configparser.ConfigParser()
-        for section, items in remote.items():
-            cp[section] = items
-        with open(self.service.args.configfile, "w") as f:
-            cp.write(f)
 
         self.logger.info("httpconfprov: config updated from %s, restarting", url)
         self.service.exitevent.set()
