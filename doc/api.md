@@ -56,6 +56,14 @@ This page is generated from the pympacds docstrings.
 .. autoclass:: pympacds.middleware.HttpConfigMiddleware
    :members:
    :show-inheritance:
+
+.. autoclass:: pympacds.signal_action.SignalActionMiddleware
+   :members:
+   :show-inheritance:
+
+.. autoclass:: pympacds.signal_action.SignalActionContract
+   :members:
+   :show-inheritance:
 ```
 
 ## Configuration

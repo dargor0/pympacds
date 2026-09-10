@@ -12,6 +12,7 @@ features
 config
 contracts
 middleware
+signal_action
 api
 ```
 

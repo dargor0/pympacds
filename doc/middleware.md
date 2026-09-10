@@ -38,6 +38,12 @@ class MiddlewareBase:
 
 The framework calls these hooks in order during `init_loop()` and `close_loop()` (see `ProcessBase` in the API).
 
+**Non-fatal by design.** Middleware should not abort the service. A
+misconfigured or failing middleware logs a warning and is skipped or disabled
+(`on_error()` returns `true` to continue, rather than `false` to abort). The
+built-in middleware never raise from `setup()`/`teardown()` — see the
+`httpconfprov` section below and [Signal-Action Middleware](signal_action.md).
+
 ## Discovery
 
 Middleware classes are discovered via Python entry points. A middleware package declares itself in its `pyproject.toml`:
@@ -49,9 +55,30 @@ httpconfprov = "pympacds.middleware:HttpConfigMiddleware"
 
 The framework loads the class lazily, only for middleware enabled in the INI file.
 
+## Accessing a middleware instance
+
+A service can obtain an activated middleware instance to call its public APIs at
+runtime (for example, `signal_action.register_rule()`). `ProcessBase` provides:
+
+```python
+def get_middleware(self, ident: type | str) -> MiddlewareBase | None
+```
+
+- `ident` is a `MiddlewareBase` subclass (matched by exact class) or the
+  entry-point name string (e.g. `"signal_action"`).
+- Returns the singleton instance, or `None` if the middleware is not activated.
+
+```python
+mw = self.get_middleware(SignalActionMiddleware)
+if mw is not None:
+    await mw.register_rule("gpio_to_http", "@gpio:line_changed", "@http:send")
+```
+
 ## Built-in middleware: `httpconfprov`
 
-The framework ships one built-in middleware, `httpconfprov`, which downloads the service configuration from an HTTP server at startup.
+The framework ships two built-in middleware — `httpconfprov` (this section) and
+`signal_action` ([Signal-Action Middleware](signal_action.md)). `httpconfprov`
+downloads the service configuration from an HTTP server at startup.
 
 ### Purpose
 
@@ -92,6 +119,25 @@ Only the Python standard library is used (`urllib.request`).
 | Fleet-wide config push | `https://config.example.com/model/ABC/%s` |
 | Identity-based config | `https://config.example.com/?serial=%s` |
 | Primary + fallback | Two `httpconfprov` entries pointing at different servers |
+
+## Built-in middleware: `signal_action`
+
+`signal_action` lets a service react to D-Bus signals from other services and,
+on each received signal, invoke a configured target method — driven entirely by
+configuration:
+
+```ini
+[middleware]
+signal_action = signal_rules
+
+[signal_rules]
+gpio_to_http = {"trigger": "@gpio:line_changed", "action": "@http:send"}
+```
+
+It resolves `@capability` tags through friend discovery and introspection, maps
+signal arguments to target-method arguments, and re-arms persistent rules as
+peers come and go. See [Signal-Action Middleware](signal_action.md) for the full
+rule syntax, argument mapping, and D-Bus export.
 
 ## Writing a custom middleware
 

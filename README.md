@@ -44,7 +44,7 @@ pympacds provides:
 - **D-Bus transport** — `DBusManager` over `dbus-fast`, configurable namespace prefix, and graceful disconnect.
 - **Service discovery** — automatic peer detection and dynamic subscribe/unsubscribe between services.
 - **Interface contracts** — validated D-Bus interface definitions, with built-in `Health`, `Lifecycle`, `Config`, and `Metrics` contracts.
-- **Middleware** — optional lifecycle extensions (e.g. HTTP config provisioning).
+- **Middleware** — optional lifecycle extensions (HTTP config provisioning, signal-action rules).
 
 See [Features and Philosophy](doc/features.md) for the full details.
 
@@ -131,6 +131,7 @@ Detailed documentation lives in the [`doc/`](doc/) directory:
 - [Configuration](doc/config.md)
 - [Built-in Contracts](doc/contracts.md)
 - [Middleware](doc/middleware.md)
+- [Signal-Action Middleware](doc/signal_action.md)
 
 ## Key Concepts
 
