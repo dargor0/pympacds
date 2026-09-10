@@ -1,3 +1,13 @@
+pympacds (0.2.0-1) unstable; urgency=medium
+
+  * Add signal_action middleware.
+  * Add middleware instance access (get_middleware).
+  * Add D-Bus introspection access (BusIntrospect / introspect_tree).
+  * Add capability tags (provides/requires) and friend-tag lookup.
+  * Middleware errors are non-fatal by design.
+
+ -- Oscar Diaz <odiaz@ieee.org>  Wed, 10 Sep 2026 11:27:16 -0500
+
 pympacds (0.1.0-1) unstable; urgency=medium
 
   * Initial release.
