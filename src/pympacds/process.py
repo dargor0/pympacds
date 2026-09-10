@@ -48,6 +48,7 @@ class ProcessBase:
         self.exitevent: asyncio.Event | None = None
         self.tasklist: dict[str, asyncio.Task] = {}
         self._middleware_instances: list = []
+        self._middleware_names: dict = {}
         self._validate_user_schema: bool = True
         self._schema_file: str | None = None
 
@@ -633,13 +634,29 @@ class ProcessBase:
 
         instances: list = []
         by_class: dict = {}
+        by_name: dict = {}
 
-        self._load_programmatic_middleware(ep_map, instances, by_class)
-        self._load_config_middleware(ep_map, instances, by_class)
+        self._load_programmatic_middleware(ep_map, instances, by_class, by_name)
+        self._load_config_middleware(ep_map, instances, by_class, by_name)
 
         self._middleware_instances = instances
+        self._middleware_names = by_name
 
-    def _load_programmatic_middleware(self, ep_map, instances, by_class) -> None:
+    def get_middleware(self, ident) -> "object | None":
+        """Return an activated middleware instance (REQ-MIDW-017).
+
+        ``ident`` is a ``MiddlewareBase`` subclass (matched by exact class) or
+        an entry-point name string (e.g. ``"signal_action"``).  Returns the
+        singleton instance, or ``None`` if the middleware is not activated.
+        """
+        if isinstance(ident, str):
+            return self._middleware_names.get(ident)
+        for mw in self._middleware_instances:
+            if type(mw) is ident:
+                return mw
+        return None
+
+    def _load_programmatic_middleware(self, ep_map, instances, by_class, by_name) -> None:
         """Instantiate always-on middleware from ``register_middleware()``."""
         for spec in self.register_middleware():
             cls = self._resolve_middleware_class(ep_map, spec.middleware)
@@ -661,12 +678,14 @@ class ProcessBase:
                 continue
             instances.append(instance)
             by_class[cls] = instance
+            if isinstance(spec.middleware, str):
+                by_name[spec.middleware] = instance
             self.logger.debug(
                 "Programmatic middleware '%s' instantiated",
                 getattr(cls, "__name__", cls),
             )
 
-    def _load_config_middleware(self, ep_map, instances, by_class) -> None:
+    def _load_config_middleware(self, ep_map, instances, by_class, by_name) -> None:
         """Instantiate config-activated middleware from the ``[middleware]`` section."""
         for mw_name, section in self._load_middleware_from_config():
             if mw_name not in ep_map:
@@ -686,6 +705,7 @@ class ProcessBase:
                     if section is not None and self.config.has_section(section)
                     else {}
                 )
+                by_name[mw_name] = mw
                 self.logger.debug("Middleware '%s' section updated from config", mw_name)
                 continue
             try:
@@ -695,6 +715,7 @@ class ProcessBase:
                 continue
             instances.append(instance)
             by_class[cls] = instance
+            by_name[mw_name] = instance
             self.logger.debug("Middleware '%s' instantiated", mw_name)
 
     async def _setup_middleware(self) -> bool:
@@ -711,5 +732,7 @@ class ProcessBase:
                 self.logger.warning("Middleware setup error (continuing): %s", exc)
         # remove failed middleware from the list
         for i in reversed(failed):
-            self._middleware_instances.pop(i)
+            mw = self._middleware_instances.pop(i)
+            for name in [k for k, v in self._middleware_names.items() if v is mw]:
+                del self._middleware_names[name]
         return True
