@@ -1,0 +1,26 @@
+[DEFAULT]
+loglevel = INFO
+logstdout = false
+logfile = /var/log/pympacds/gpio.log
+
+[dbus]
+bus_prefix = org.pympacds
+contract_health = true
+contract_config = true
+validate_user_schema = true
+schema_file = /usr/share/pympacds/gpio.schema.json
+
+[gpio]
+chip =
+lines =
+watch_lines =
+edge = both
+debounce_us = 0
+active_low = false
+output_lines =
+default_values =
+
+[gpio.linemap]
+;btn = 0
+;relay = 5
+;led1 = 12

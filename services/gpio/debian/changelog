@@ -1,0 +1,6 @@
+pympacds-gpio (0.1.0-1) unstable; urgency=medium
+
+  * Initial Debian packaging.
+  * GPIO server service with gpiod (libgpiod v2) behind an internal shim.
+
+ -- Oscar Diaz <odiaz@ieee.org>  Wed, 10 Sep 2026 00:00:00 -0500

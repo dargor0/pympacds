@@ -1,0 +1,3 @@
+# Grant the gpio group access to the GPIO character devices so the
+# pympacds-gpio service can run without root (REQ-GPIO-008).
+SUBSYSTEM=="gpio", KERNEL=="gpiochip*", GROUP="gpio", MODE="0660"

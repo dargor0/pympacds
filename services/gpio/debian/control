@@ -1,0 +1,27 @@
+Source: pympacds-gpio
+Maintainer: Oscar Diaz <odiaz@ieee.org>
+Section: python
+Priority: optional
+Build-Depends: debhelper (>= 12~),
+ dh-python,
+ python3,
+ python3-setuptools,
+ pybuild-plugin-pyproject
+Standards-Version: 4.6.0
+X-Python3-Version: >= 3.10
+
+Package: python3-pympacds-gpio
+Architecture: all
+Depends: ${python3:Depends}, ${misc:Depends},
+ python3-pympacds (>= 0.2.0),
+ python3-gpiod
+Description: GPIO server service for pympacds
+ pympacds-gpio monitors GPIO line state and edge events and exposes reads,
+ writes, and change notifications over D-Bus.
+ .
+ It uses the gpiod (libgpiod v2) Python bindings behind an internal shim and
+ exports the GPIO contract (get_value/set_value/get_lines/status with the
+ line_changed signal) alongside the framework Health and Config contracts.
+ .
+ A udev rule grants the gpio group access to /dev/gpiochip* so the service
+ does not need to run as root.
