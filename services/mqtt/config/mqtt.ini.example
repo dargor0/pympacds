@@ -7,6 +7,8 @@ logfile = /var/log/pympacds/mqtt.log
 bus_prefix = org.pympacds
 contract_health = true
 contract_config = true
+validate_user_schema = true
+schema_file = /usr/share/pympacds/mqtt.schema.json
 
 [mqtt]
 host = localhost

@@ -50,6 +50,12 @@ class FakeClient:
     def loop_misc(self):
         self.calls.append(("loop_misc",))
 
+    def connect(self, *args, **kwargs):
+        raise AssertionError("blocking Client.connect() must not be called")
+
+    def loop(self, *args, **kwargs):
+        raise AssertionError("blocking Client.loop() must not be called")
+
     def want_write(self):
         return self._want_write
 

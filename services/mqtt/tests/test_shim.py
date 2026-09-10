@@ -420,3 +420,46 @@ class TestReconnectMethod:
         shim.connect = fake_connect
         assert await shim.reconnect() is True
         assert ("disconnect",) in fake_client.calls
+
+
+class TestBlockingPrevention:
+    @pytest.mark.asyncio
+    async def test_no_blocking_primitives(self, fake_client, monkeypatch):
+        blocked = []
+
+        def _forbidden(*args, **kwargs):
+            blocked.append(args)
+            raise AssertionError("blocking primitive called")
+
+        monkeypatch.setattr(socket, "getaddrinfo", _forbidden)
+        monkeypatch.setattr(socket, "create_connection", _forbidden)
+
+        shim = _shim(fake_client)
+        _patch_loop(monkeypatch)
+
+        task = asyncio.create_task(shim.connect())
+        await asyncio.sleep(0)
+        fake_client.emit_connect()
+        assert await task is True
+        assert blocked == []
+
+    @pytest.mark.asyncio
+    async def test_event_loop_not_stalled_during_connect(self, fake_client, monkeypatch):
+        shim = _shim(fake_client)
+        _patch_loop(monkeypatch)
+
+        ticks = []
+
+        async def ticker():
+            for _ in range(5):
+                ticks.append(1)
+                await asyncio.sleep(0.001)
+
+        connect_task = asyncio.create_task(shim.connect())
+        ticker_task = asyncio.create_task(ticker())
+        await asyncio.sleep(0.01)  # connect hangs (no CONNACK yet)
+        await ticker_task
+        assert len(ticks) == 5  # the event loop was never stalled
+
+        fake_client.emit_connect()
+        assert await connect_task is True
