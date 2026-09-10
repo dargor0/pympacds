@@ -378,8 +378,8 @@ class TestStartedFlag:
 
 class TestGetFriendTags:
     HEALTH_XML = (
-        "<node><interface name=\"org.pympacds.Health\">"
-        "<property name=\"provides\" type=\"as\" access=\"read\"/>"
+        '<node><interface name="org.pympacds.Health">'
+        '<property name="provides" type="as" access="read"/>'
         "</interface></node>"
     )
 
