@@ -37,6 +37,7 @@ docs = ["sphinx>=7.0", "myst-parser>=2.0", "furo>=2023.9.10"]
 
 [project.entry-points."pympacds.middleware"]
 httpconfprov = "pympacds.middleware:HttpConfigMiddleware"
+signal_action = "pympacds.signal_action:SignalActionMiddleware"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -71,6 +72,7 @@ select = ["E", "F", "W", "I", "B", "UP"]
 # dbus-fast/dbus-next convention, not Python type references.
 [tool.ruff.lint.per-file-ignores]
 "src/pympacds/builtin_contracts.py" = ["F821", "F722"]
+"src/pympacds/signal_action.py" = ["F821", "F722"]
 "examples/*.py" = ["F821", "F722"]
 "tests/*.py" = ["F821", "F722"]
 
@@ -82,4 +84,8 @@ ignore_missing_imports = true
 # convention, not Python types; mypy tries to resolve them as forward references.
 [[tool.mypy.overrides]]
 module = "pympacds.builtin_contracts"
+disable_error_code = ["name-defined", "valid-type"]
+
+[[tool.mypy.overrides]]
+module = "pympacds.signal_action"
 disable_error_code = ["name-defined", "valid-type"]
