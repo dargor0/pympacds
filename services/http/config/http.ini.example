@@ -1,0 +1,23 @@
+[DEFAULT]
+loglevel = INFO
+logstdout = false
+logfile = /var/log/pympacds/http.log
+
+[dbus]
+bus_prefix = org.pympacds
+contract_health = true
+contract_config = true
+validate_user_schema = true
+schema_file = /usr/share/pympacds/http.schema.json
+
+[http]
+timeout_s = 10
+retries = 3
+retry_backoff_s = 1
+tls_verify = true
+tls_certfile =
+tls_keyfile =
+max_redirects = 5
+default_url =
+default_method = POST
+default_headers =

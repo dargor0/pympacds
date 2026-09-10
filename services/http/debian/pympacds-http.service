@@ -1,0 +1,14 @@
+[Unit]
+Description=pympacds HTTP client service
+After=dbus.service network-online.target
+Requires=dbus.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/pympacds-http -c /etc/pympacds/http.ini
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

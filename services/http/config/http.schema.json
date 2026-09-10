@@ -1,0 +1,16 @@
+{
+  "http": {
+    "keys": {
+      "timeout_s": {"type": "int", "min": 0},
+      "retries": {"type": "int", "min": 0},
+      "retry_backoff_s": {"type": "int", "min": 0},
+      "tls_verify": {"type": "bool"},
+      "tls_certfile": {"type": "str"},
+      "tls_keyfile": {"type": "str"},
+      "max_redirects": {"type": "int", "min": 0},
+      "default_url": {"type": "str"},
+      "default_method": {"type": "str", "pattern": "^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)$"},
+      "default_headers": {"type": "str"}
+    }
+  }
+}

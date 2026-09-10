@@ -1,0 +1,24 @@
+Source: pympacds-http
+Maintainer: Oscar Diaz <odiaz@ieee.org>
+Section: python
+Priority: optional
+Build-Depends: debhelper (>= 12~),
+ dh-python,
+ python3,
+ python3-setuptools,
+ pybuild-plugin-pyproject
+Standards-Version: 4.6.0
+X-Python3-Version: >= 3.10
+
+Package: python3-pympacds-http
+Architecture: all
+Depends: ${python3:Depends}, ${misc:Depends},
+ python3-pympacds (>= 0.2.0),
+ python3-aiohttp
+Description: HTTP client service for pympacds
+ pympacds-http sends data over HTTP on behalf of other services and exposes
+ it over D-Bus, with automatic retry and optional mutual TLS.
+ .
+ It uses a single pooled aiohttp session and exposes the HTTP contract
+ (send/download/request with the request_completed signal) alongside the
+ framework Health and Config contracts.
