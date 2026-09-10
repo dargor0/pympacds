@@ -6,12 +6,12 @@ Run:  python3 sensor.py -c sensor.ini
 import asyncio
 import json
 import random
-import time
 import uuid
+
 from pympacds import get_dbus_lib
-from pympacds.process import ProcessBase
+from pympacds.contracts import ServiceContract, dbus_method, dbus_property, dbus_signal
 from pympacds.dbus import DBusManager
-from pympacds.contracts import ServiceContract, dbus_method, dbus_signal, dbus_property
+from pympacds.process import ProcessBase
 
 _PropertyAccess = get_dbus_lib().PropertyAccess
 

@@ -86,6 +86,12 @@ ignore_missing_imports = true
 module = "pympacds.builtin_contracts"
 disable_error_code = ["name-defined", "valid-type"]
 
+# The base class is resolved dynamically from the D-Bus library, so its type is
+# not known statically (dynamic base class).
+[[tool.mypy.overrides]]
+module = "pympacds.contracts"
+disable_error_code = ["valid-type", "misc"]
+
 [[tool.mypy.overrides]]
 module = "pympacds.signal_action"
 disable_error_code = ["name-defined", "valid-type"]

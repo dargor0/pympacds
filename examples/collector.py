@@ -4,10 +4,11 @@ Run:  python3 collector.py -c collector.ini
 """
 
 import asyncio
+
 from pympacds import get_dbus_lib
-from pympacds.process import ProcessBase
-from pympacds.dbus import DBusManager
 from pympacds.contracts import ServiceContract, dbus_property
+from pympacds.dbus import DBusManager
+from pympacds.process import ProcessBase
 
 _PropertyAccess = get_dbus_lib().PropertyAccess
 

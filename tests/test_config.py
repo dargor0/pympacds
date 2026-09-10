@@ -4,7 +4,6 @@ import configparser
 import json
 import os
 import tempfile
-import pytest
 
 
 class TestConfigManager:
@@ -133,12 +132,6 @@ class TestConfigManager:
 
 
 """Additional tests for config validation edge cases."""
-
-import configparser
-import json
-import os
-import tempfile
-import pytest
 
 
 class TestConfigValidationEdgeCases:

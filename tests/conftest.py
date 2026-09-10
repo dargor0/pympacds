@@ -1,13 +1,13 @@
 """Shared pytest fixtures for pympacds tests."""
 
+import configparser
 import os
 import signal
 import subprocess
 import tempfile
 import time
-import configparser
-import pytest
 
+import pytest
 
 # ------------------------------------------------------------------
 # INI config fixtures
@@ -186,6 +186,7 @@ def session_bus_address():
 async def session_bus(session_bus_address):
     """Create a connected DBusManager on the isolated session bus."""
     import logging
+
     from pympacds.dbus import DBusManager
 
     logger = logging.getLogger("test_dbus")

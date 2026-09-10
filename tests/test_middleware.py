@@ -1,5 +1,9 @@
 """Tests for MiddlewareBase (REQ-MIDW-001)."""
 
+import configparser
+import io
+import json
+
 import pytest
 
 
@@ -53,12 +57,6 @@ class TestMiddlewareBase:
 
 """Tests for builtin middleware (REQ-MIDW-002)."""
 
-import configparser
-import io
-import json
-import pytest
-import urllib.error
-
 
 class TestHttpConfigMiddleware:
     def test_construction(self, process_base):
@@ -78,8 +76,9 @@ class TestHttpConfigMiddleware:
 
     @pytest.mark.asyncio
     async def test_fetch_failure_continues(self, process_base, ini_file, monkeypatch):
-        from pympacds.middleware import HttpConfigMiddleware
         import urllib.request
+
+        from pympacds.middleware import HttpConfigMiddleware
 
         cp = configparser.ConfigParser()
         cp.read(ini_file)
@@ -103,8 +102,9 @@ class TestHttpConfigMiddleware:
 
     @pytest.mark.asyncio
     async def test_config_unchanged(self, process_base, ini_file, monkeypatch):
-        from pympacds.middleware import HttpConfigMiddleware
         import urllib.request
+
+        from pympacds.middleware import HttpConfigMiddleware
 
         cp = configparser.ConfigParser()
         cp.read(ini_file)
@@ -131,8 +131,9 @@ class TestHttpConfigMiddleware:
     async def test_config_changed_triggers_restart(
         self, process_base, ini_file, tmp_path, monkeypatch
     ):
-        from pympacds.middleware import HttpConfigMiddleware
         import urllib.request
+
+        from pympacds.middleware import HttpConfigMiddleware
 
         # Use a tmp_path config file so the write goes to a known location
         cfg_path = str(tmp_path / "test.ini")

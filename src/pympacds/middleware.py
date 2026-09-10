@@ -7,6 +7,7 @@ import json
 import logging
 import urllib.request
 from dataclasses import dataclass
+from typing import Any
 
 from .process import ProcessBase
 
@@ -44,10 +45,9 @@ class MiddlewareBase:
         self.service = service
         self.section = section
         self.logger = service.logger.getChild(self.__class__.__name__.lower())
+        self._config: Any = {}
         if section is not None and service.config.has_section(section):
             self._config = service.config[section]
-        else:
-            self._config = {}
 
     @property
     def config(self) -> dict:
@@ -167,4 +167,5 @@ class HttpConfigMiddleware(MiddlewareBase):
             return
 
         self.logger.info("httpconfprov: config updated from %s, restarting", url)
-        self.service.exitevent.set()
+        if self.service.exitevent is not None:
+            self.service.exitevent.set()

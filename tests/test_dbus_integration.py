@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+
 import pytest
 
 pytestmark = pytest.mark.asyncio
@@ -49,8 +50,8 @@ async def test_get_interface_introspects_dbus(session_bus):
 
 async def test_get_friend_bus(session_bus, session_bus_address):
     """get_friend_bus returns a proxy for a discovered friend."""
-    from pympacds.dbus import DBusManager
     from pympacds.contracts import ServiceContract, dbus_method
+    from pympacds.dbus import DBusManager
 
     # define a minimal contract the friend exports
     class FriendContract(ServiceContract):

@@ -5,6 +5,7 @@ import configparser
 import json
 import os
 import sys
+
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
@@ -84,8 +85,9 @@ async def test_close_loop_with_bus_stop(ini_file):
 
 @pytest.mark.asyncio
 async def test_middleware_init_discovery(ini_file, monkeypatch):
-    from pympacds.process import ProcessBase
     import importlib.metadata
+
+    from pympacds.process import ProcessBase
 
     class FakeEP:
         name = "test_mw"

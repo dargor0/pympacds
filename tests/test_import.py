@@ -1,7 +1,8 @@
 """Tests for D-Bus library import strategy (REQ-DBUS-001), import error path and edge cases."""
 
-import sys
 import os
+import sys
+
 import pytest
 
 
@@ -91,9 +92,9 @@ def test_all_modules_match(monkeypatch):
     """All getter functions return dbus-fast modules when dbus-fast is installed."""
     with PrepareModule(monkeypatch, False):
         from pympacds import (
+            get_dbus_aio,
             get_dbus_backend,
             get_dbus_lib,
-            get_dbus_aio,
             get_dbus_service,
         )
 
@@ -119,9 +120,9 @@ def test_import_force_dbus_next(monkeypatch):
     with PrepareModule(monkeypatch, False, "dbus-next"):
         import pympacds
         from pympacds import (
+            get_dbus_aio,
             get_dbus_backend,
             get_dbus_lib,
-            get_dbus_aio,
             get_dbus_service,
         )
 
@@ -138,9 +139,9 @@ def test_import_force_dbus_fast(monkeypatch):
     with PrepareModule(monkeypatch, False, "dbus-fast"):
         import pympacds
         from pympacds import (
+            get_dbus_aio,
             get_dbus_backend,
             get_dbus_lib,
-            get_dbus_aio,
             get_dbus_service,
         )
 
@@ -157,9 +158,9 @@ def test_import_force_dbus_unknown(monkeypatch):
     with PrepareModule(monkeypatch, False, "dbus-unknown"):
         import pympacds
         from pympacds import (
+            get_dbus_aio,
             get_dbus_backend,
             get_dbus_lib,
-            get_dbus_aio,
             get_dbus_service,
         )
 

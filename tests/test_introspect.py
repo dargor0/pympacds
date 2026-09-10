@@ -2,7 +2,6 @@
 
 import pytest
 
-
 _XML = """\
 <!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Introspection 1.0//EN"
  "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">

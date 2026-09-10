@@ -7,13 +7,14 @@ multi-process, asyncio-based daemons on Linux.
 
 import logging
 import os
+from typing import Any, cast
 
 _logger = logging.getLogger(__name__)
 
 _DBUS_BACKEND: str | None = None
-_dbus_lib: object | None = None
-_dbus_aio: object | None = None
-_dbus_service: object | None = None
+_dbus_lib: Any = None
+_dbus_aio: Any = None
+_dbus_service: Any = None
 
 _import_error_msg: str = (
     "pympacds requires a D-Bus library. "
@@ -23,7 +24,7 @@ _import_error_msg: str = (
 )
 
 
-def _import_dbus() -> tuple[str, object, object, object]:
+def _import_dbus() -> tuple[str, Any, Any, Any]:
     """Import the D-Bus library in priority order.
 
     Tries ``dbus-fast`` first, then ``dbus-next``.  Set the environment
@@ -56,7 +57,7 @@ def _import_dbus() -> tuple[str, object, object, object]:
                 raise ImportError(_import_error_msg)
 
     _logger.info("D-Bus backend: %s", _DBUS_BACKEND)
-    return _DBUS_BACKEND, _dbus_lib, _dbus_aio, _dbus_service
+    return cast(str, _DBUS_BACKEND), _dbus_lib, _dbus_aio, _dbus_service
 
 
 def _try_dbus_fast_import(doraise: bool) -> bool:
@@ -78,7 +79,7 @@ def _try_dbus_fast_import(doraise: bool) -> bool:
         _DBUS_BACKEND = "dbus-fast"
     except ImportError:
         if doraise:
-            raise ImportError(_import_error_msg)
+            raise ImportError(_import_error_msg) from None
         return False
     else:
         return True
@@ -103,7 +104,7 @@ def _try_dbus_next_import(doraise: bool) -> bool:
         _DBUS_BACKEND = "dbus-next"
     except ImportError:
         if doraise:
-            raise ImportError(_import_error_msg)
+            raise ImportError(_import_error_msg) from None
         return False
     else:
         return True
@@ -113,24 +114,24 @@ def get_dbus_backend() -> str:
     """Return the active D-Bus library name (``"dbus-fast"`` or ``"dbus-next"``)."""
     if _DBUS_BACKEND is None:
         _import_dbus()
-    return _DBUS_BACKEND
+    return cast(str, _DBUS_BACKEND)
 
 
-def get_dbus_lib() -> object:
+def get_dbus_lib() -> Any:
     """Return the active D-Bus library root module."""
     if _dbus_lib is None:
         _import_dbus()
     return _dbus_lib
 
 
-def get_dbus_aio() -> object:
+def get_dbus_aio() -> Any:
     """Return the active D-Bus asyncio module."""
     if _dbus_aio is None:
         _import_dbus()
     return _dbus_aio
 
 
-def get_dbus_service() -> object:
+def get_dbus_service() -> Any:
     """Return the active D-Bus service module."""
     if _dbus_service is None:
         _import_dbus()

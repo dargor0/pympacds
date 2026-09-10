@@ -1,13 +1,14 @@
 """Higher-level friend bus subscription helpers."""
 
 import logging
+from typing import Any
 
 
 async def connect_friendbus(
     basebusname: str,
     busdict: dict,
-    buscallback: object | None,
-    busobj: object,
+    buscallback: Any,
+    busobj: Any,
     logger: logging.Logger,
 ) -> None:
     """Dynamically subscribe and unsubscribe to friend buses.

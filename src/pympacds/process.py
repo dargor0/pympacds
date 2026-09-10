@@ -1,14 +1,14 @@
 """ProcessBase — the foundation class for all pympacds services."""
 
-import sys
-import os
-import signal
-import logging
-import logging.handlers
-import configparser
 import argparse
 import asyncio
-from typing import TYPE_CHECKING
+import configparser
+import logging
+import logging.handlers
+import os
+import signal
+import sys
+from typing import TYPE_CHECKING, Any
 
 from .dbus import DBusManager
 
@@ -43,7 +43,7 @@ class ProcessBase:
         self.argparser = argparse.ArgumentParser(description=description)
         self.argparser.add_argument("-c", "--configfile", help="Main configuration file")
 
-        self.bus = None
+        self.bus: Any = None
 
         self.exitevent: asyncio.Event | None = None
         self.tasklist: dict[str, asyncio.Task] = {}
@@ -287,6 +287,7 @@ class ProcessBase:
         """Validate user-defined sections against a JSON schema file."""
         import json
 
+        assert self._schema_file is not None
         try:
             with open(self._schema_file) as f:
                 schema = json.load(f)
@@ -444,6 +445,7 @@ class ProcessBase:
             await self.close_loop()
             return
 
+        assert self.exitevent is not None
         while not self.exitevent.is_set():
             self.update_tasks()
             try:
@@ -524,6 +526,7 @@ class ProcessBase:
             events: Additional awaitables to wait on alongside the exit event.
         """
         try:
+            assert self.exitevent is not None
             if events is not None:
                 local = [asyncio.ensure_future(e) for e in events]
                 local.append(asyncio.ensure_future(self.exitevent.wait()))
@@ -551,10 +554,11 @@ class ProcessBase:
             return
         for signum in (signal.SIGHUP, signal.SIGTERM, signal.SIGINT):
             try:
-                loop.add_signal_handler(
-                    signum,
-                    lambda s=signum: asyncio.create_task(self._signal_term_handler(s)),
-                )
+
+                def _handler(sig: int = signum) -> None:
+                    asyncio.create_task(self._signal_term_handler(sig))
+
+                loop.add_signal_handler(signum, _handler)
             except (ValueError, OSError):
                 self.logger.exception("Cannot register signal handler for %d", signum)
 
@@ -579,9 +583,8 @@ class ProcessBase:
             return []
         result: list[tuple[str, str | None]] = []
         for key, value in self.config["middleware"].items():
-            section: str | None = value.strip()
-            if section.lower() == "none":
-                section = None
+            raw = value.strip()
+            section: str | None = None if raw.lower() == "none" else raw
             result.append((key, section))
         return result
 

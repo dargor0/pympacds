@@ -68,8 +68,8 @@ class TestServiceContract:
         assert meta["requires"] == ["network"]
 
     def test_inherits_from_library_service_interface(self):
-        from pympacds.contracts import ServiceContract
         from pympacds import get_dbus_service
+        from pympacds.contracts import ServiceContract
 
         svc_iface = get_dbus_service().ServiceInterface
         assert issubclass(ServiceContract, svc_iface)
@@ -93,9 +93,6 @@ class TestDecorators:
 
 
 """Additional tests for contracts decorators."""
-
-import asyncio
-import pytest
 
 
 class TestDBusMethodDecorator:
@@ -161,8 +158,6 @@ not by direct Python calls. These tests verify construction, metadata,
 and error detection — not runtime delegation.
 """
 
-import pytest
-
 
 class MockService:
     """Minimal mock implementing all contract callbacks."""
@@ -212,7 +207,7 @@ class TestHealthContract:
 
         svc = MockService()
         hc = HealthContract("com.example.Health", svc)
-        assert getattr(hc, "uptime") == 42
+        assert hc.uptime == 42
 
     def test_missing_callback_raises(self):
         from pympacds.builtin_contracts import HealthContract
@@ -256,9 +251,9 @@ class TestContractCapabilityTags:
 
     def test_provides_and_requires_are_lists(self):
         from pympacds.builtin_contracts import (
+            ConfigContract,
             HealthContract,
             LifecycleContract,
-            ConfigContract,
             MetricsContract,
         )
 

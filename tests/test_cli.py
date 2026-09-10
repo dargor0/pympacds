@@ -1,8 +1,10 @@
 """Integration tests for the CLI tool."""
 
+import os
 import subprocess
 import sys
-import os
+
+import pytest
 
 _PKG_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
 
@@ -57,11 +59,6 @@ def test_cli_list():
 
 
 """Direct unit tests for CLI helper functions."""
-
-import os
-import sys
-import tempfile
-import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
@@ -152,6 +149,7 @@ class TestCLIHelpers:
 
     def test_validate_builtin_ok(self):
         import configparser
+
         from pympacds.cli import _validate_builtin
 
         cp = configparser.ConfigParser()
@@ -161,6 +159,7 @@ class TestCLIHelpers:
 
     def test_validate_builtin_invalid_loglevel(self):
         import configparser
+
         from pympacds.cli import _validate_builtin
 
         cp = configparser.ConfigParser()
@@ -170,6 +169,7 @@ class TestCLIHelpers:
 
     def test_validate_builtin_invalid_bus_type(self):
         import configparser
+
         from pympacds.cli import _validate_builtin
 
         cp = configparser.ConfigParser()
@@ -180,6 +180,7 @@ class TestCLIHelpers:
 
     def test_validate_builtin_no_dbus_section(self):
         import configparser
+
         from pympacds.cli import _validate_builtin
 
         cp = configparser.ConfigParser()

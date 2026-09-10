@@ -8,8 +8,7 @@ import pytest
 
 from pympacds.introspect import BusIntrospect
 from pympacds.process import ProcessBase
-from pympacds.signal_action import SignalActionMiddleware, SignalActionContract, SignalEvent
-
+from pympacds.signal_action import SignalActionContract, SignalActionMiddleware, SignalEvent
 
 # ----------------------------------------------------------------------
 # fakes
