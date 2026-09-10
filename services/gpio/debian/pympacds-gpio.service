@@ -1,0 +1,17 @@
+[Unit]
+Description=pympacds GPIO server service
+After=dbus.service
+Requires=dbus.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/pympacds-gpio -c /etc/pympacds/gpio.ini
+Restart=always
+RestartSec=5
+# Run unprivileged: create a service user and add it to the 'gpio' group
+# (see the udev rule shipped by this package), then uncomment:
+#User=pympacds
+#Group=gpio
+
+[Install]
+WantedBy=multi-user.target

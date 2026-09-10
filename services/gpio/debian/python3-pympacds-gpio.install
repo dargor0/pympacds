@@ -1,0 +1,2 @@
+config/gpio.ini.example usr/share/pympacds/
+config/gpio.schema.json usr/share/pympacds/

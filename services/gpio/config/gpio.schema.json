@@ -1,0 +1,14 @@
+{
+  "gpio": {
+    "keys": {
+      "chip": {"type": "str"},
+      "lines": {"type": "str"},
+      "watch_lines": {"type": "str"},
+      "edge": {"type": "str", "pattern": "^(rising|falling|both)$"},
+      "debounce_us": {"type": "int", "min": 0},
+      "active_low": {"type": "bool"},
+      "output_lines": {"type": "str"},
+      "default_values": {"type": "str"}
+    }
+  }
+}
