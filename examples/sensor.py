@@ -55,23 +55,21 @@ class SensorService(ProcessBase):
         self.iface = SensorContract("org.pympacds.example.Sensor", self)
         self.bus.add_interface("sensor", self.iface)
         await self.bus.start()
-        self.logger.info(
-            "Sensor started: bus=%s id=%s", self.bus.busname, self._sensor_id
-        )
+        self.logger.info("Sensor started: bus=%s id=%s", self.bus.busname, self._sensor_id)
         return True
 
     def update_tasks(self) -> None:
         if "emitter" not in self.tasklist:
-            self.tasklist["emitter"] = asyncio.create_task(
-                self._emit_periodic(), name="emitter"
-            )
+            self.tasklist["emitter"] = asyncio.create_task(self._emit_periodic(), name="emitter")
 
     def dbus_sensor_identify(self) -> str:
-        return json.dumps({
-            "bus": self.bus.busname,
-            "id": self._sensor_id,
-            "pid": self.pid,
-        })
+        return json.dumps(
+            {
+                "bus": self.bus.busname,
+                "id": self._sensor_id,
+                "pid": self.pid,
+            }
+        )
 
     def dbus_sensor_get_id(self) -> str:
         return self._sensor_id
@@ -84,9 +82,7 @@ class SensorService(ProcessBase):
                 self._value = random.randint(1, 100)
                 uid = str(uuid.uuid4())[:8]
                 self.iface.measurement(uid, self._value)
-                self.logger.info(
-                    "Emitted measurement: uid=%s value=%d", uid, self._value
-                )
+                self.logger.info("Emitted measurement: uid=%s value=%d", uid, self._value)
         except asyncio.CancelledError:
             pass
 

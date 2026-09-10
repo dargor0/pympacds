@@ -13,6 +13,7 @@ import pytest
 # INI config fixtures
 # ------------------------------------------------------------------
 
+
 @pytest.fixture
 def ini_file():
     """Create a temporary INI config file with defaults."""
@@ -31,9 +32,7 @@ def ini_file():
         "contract_config": "false",
         "discovery_enabled": "false",
     }
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".ini", delete=False
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".ini", delete=False) as f:
         cp.write(f)
         path = f.name
     yield path
@@ -48,6 +47,40 @@ def process_base(ini_file):
     p = ProcessBase("test_svc", "0.1.0", "pytest service")
     p.setup(["-c", ini_file])
     return p
+
+
+@pytest.fixture
+def fake_dbus_backend(monkeypatch):
+    """Monkeypatch the D-Bus library getters so DBusManager needs no real bus.
+
+    ``DBusManager.__init__`` resolves the backend through the module-level
+    ``get_dbus_lib``/``get_dbus_aio``/``get_dbus_service`` names in
+    ``pympacds.dbus``.  Replacing them with in-memory fakes lets unit tests
+    construct a manager without a running event loop or a live socket.
+    """
+    import pympacds.dbus as dbus_mod
+
+    class FakeLib:
+        class BusType:
+            SYSTEM = 1
+            SESSION = 2
+
+        class NameFlag:
+            REPLACE_EXISTING = 1
+
+    class FakeMessageBus:
+        def __init__(self, bus_type=None, **kwargs):
+            self.bus_type = bus_type
+
+    class FakeAio:
+        MessageBus = FakeMessageBus
+
+    class FakeSvc:
+        pass
+
+    monkeypatch.setattr(dbus_mod, "get_dbus_lib", lambda: FakeLib())
+    monkeypatch.setattr(dbus_mod, "get_dbus_aio", lambda: FakeAio())
+    monkeypatch.setattr(dbus_mod, "get_dbus_service", lambda: FakeSvc())
 
 
 # ------------------------------------------------------------------
@@ -92,7 +125,8 @@ def session_bus_address():
     proc = subprocess.Popen(
         [
             "dbus-daemon",
-            "--config-file", config_path,
+            "--config-file",
+            config_path,
             "--print-address",
             "--nofork",
             "--nosyslog",
@@ -135,11 +169,12 @@ def session_bus_address():
 
     stdout_f.close()
     stderr_f.close()
-    
+
     with open(stdout_path) as f:
         stdout_text = f.read()
-    
+
     import shutil
+
     shutil.rmtree(tmpdir, ignore_errors=True)
 
 
@@ -151,7 +186,7 @@ async def session_bus(session_bus_address):
 
     logger = logging.getLogger("test_dbus")
     logger.setLevel(logging.WARN)
-    
+
     oldaddr = os.environ.get("DBUS_SYSTEM_BUS_ADDRESS", None)
     os.environ["DBUS_SYSTEM_BUS_ADDRESS"] = session_bus_address
 
@@ -166,7 +201,7 @@ async def session_bus(session_bus_address):
     await mgr.start()
     yield mgr
     await mgr.stop()
-    
+
     if oldaddr:
         os.environ["DBUS_SYSTEM_BUS_ADDRESS"] = oldaddr
     else:

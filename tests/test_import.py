@@ -27,6 +27,7 @@ class PrepareModule:
                 self.mp.delitem(sys.modules, key, raising=False)
 
         import builtins
+
         real_import = builtins.__import__
 
         def mock_import(name: str, *args, **kwargs):
@@ -54,6 +55,7 @@ def test_get_dbus_backend(monkeypatch):
     """get_dbus_backend returns a recognised backend name."""
     with PrepareModule(monkeypatch, False):
         from pympacds import get_dbus_backend
+
         backend = get_dbus_backend()
         assert backend in ("dbus-fast", "dbus-next")
 
@@ -62,6 +64,7 @@ def test_get_dbus_lib(monkeypatch):
     """get_dbus_lib returns a non-None module object."""
     with PrepareModule(monkeypatch, False):
         from pympacds import get_dbus_lib
+
         lib = get_dbus_lib()
         assert lib is not None
 
@@ -70,6 +73,7 @@ def test_get_dbus_aio(monkeypatch):
     """get_dbus_aio returns a non-None module object."""
     with PrepareModule(monkeypatch, False):
         from pympacds import get_dbus_aio
+
         aio = get_dbus_aio()
         assert aio is not None
 
@@ -78,6 +82,7 @@ def test_get_dbus_service(monkeypatch):
     """get_dbus_service returns a non-None module object."""
     with PrepareModule(monkeypatch, False):
         from pympacds import get_dbus_service
+
         svc = get_dbus_service()
         assert svc is not None
 
@@ -85,7 +90,13 @@ def test_get_dbus_service(monkeypatch):
 def test_all_modules_match(monkeypatch):
     """All getter functions return dbus-fast modules when dbus-fast is installed."""
     with PrepareModule(monkeypatch, False):
-        from pympacds import get_dbus_backend, get_dbus_lib, get_dbus_aio, get_dbus_service
+        from pympacds import (
+            get_dbus_backend,
+            get_dbus_lib,
+            get_dbus_aio,
+            get_dbus_service,
+        )
+
         backend = get_dbus_backend()
         assert backend == "dbus-fast"
         assert get_dbus_lib().__name__ == "dbus_fast"
@@ -97,6 +108,7 @@ def test_import_error_message(monkeypatch):
     """ImportError is raised with a clear message when no D-Bus library is installed."""
     with PrepareModule(monkeypatch, True):
         import pympacds
+
         pympacds._DBUS_BACKEND = None
         with pytest.raises(ImportError, match="requires a D-Bus library"):
             pympacds._import_dbus()
@@ -106,7 +118,13 @@ def test_import_force_dbus_next(monkeypatch):
     """PYMPACDS_DBUS_BACKEND=dbus-next forces the dbus-next backend."""
     with PrepareModule(monkeypatch, False, "dbus-next"):
         import pympacds
-        from pympacds import get_dbus_backend, get_dbus_lib, get_dbus_aio, get_dbus_service
+        from pympacds import (
+            get_dbus_backend,
+            get_dbus_lib,
+            get_dbus_aio,
+            get_dbus_service,
+        )
+
         pympacds._DBUS_BACKEND = None
         backend = get_dbus_backend()
         assert backend == "dbus-next"
@@ -119,7 +137,13 @@ def test_import_force_dbus_fast(monkeypatch):
     """PYMPACDS_DBUS_BACKEND=dbus-fast forces the dbus-fast backend."""
     with PrepareModule(monkeypatch, False, "dbus-fast"):
         import pympacds
-        from pympacds import get_dbus_backend, get_dbus_lib, get_dbus_aio, get_dbus_service
+        from pympacds import (
+            get_dbus_backend,
+            get_dbus_lib,
+            get_dbus_aio,
+            get_dbus_service,
+        )
+
         pympacds._DBUS_BACKEND = None
         backend = get_dbus_backend()
         assert backend == "dbus-fast"
@@ -132,7 +156,13 @@ def test_import_force_dbus_unknown(monkeypatch):
     """PYMPACDS_DBUS_BACKEND with an unknown value falls back to dbus-fast."""
     with PrepareModule(monkeypatch, False, "dbus-unknown"):
         import pympacds
-        from pympacds import get_dbus_backend, get_dbus_lib, get_dbus_aio, get_dbus_service
+        from pympacds import (
+            get_dbus_backend,
+            get_dbus_lib,
+            get_dbus_aio,
+            get_dbus_service,
+        )
+
         pympacds._DBUS_BACKEND = None
         backend = get_dbus_backend()
         assert backend == "dbus-fast"

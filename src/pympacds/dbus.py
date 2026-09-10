@@ -4,6 +4,7 @@ import asyncio
 import logging
 
 from . import get_dbus_lib, get_dbus_aio, get_dbus_service
+from .introspect import BusIntrospect
 
 _DEFAULT_BUS_PREFIX = "org.pympacds"
 
@@ -52,13 +53,9 @@ class DBusManager:
         else:
             self.busname = busname
 
-        self._bus_type: int = (
-            bus_type if bus_type is not None else self._lib.BusType.SYSTEM
-        )
+        self._bus_type: int = bus_type if bus_type is not None else self._lib.BusType.SYSTEM
         self._name_flags: int = (
-            name_flags
-            if name_flags is not None
-            else self._lib.NameFlag.REPLACE_EXISTING
+            name_flags if name_flags is not None else self._lib.NameFlag.REPLACE_EXISTING
         )
         self._drain_timeout_ms: int = drain_timeout_ms
         self._discovery_enabled: bool = discovery_enabled
@@ -70,6 +67,10 @@ class DBusManager:
         self.bus: object = self._aio.MessageBus(bus_type=self._bus_type)
         self._dbusif: object | None = None
         self._obj_root: str = _prefix_to_path(self._bus_prefix)
+
+        # per-friend caches (REQ-DBUS-013): introspection snapshots and proxies
+        self._introspect_cache: dict[str, dict[str, BusIntrospect]] = {}
+        self._proxy_cache: dict[tuple[str, str], object] = {}
 
         self.logger.debug(f"DBus ({self.busname}) initialized.")
 
@@ -137,10 +138,11 @@ class DBusManager:
     # remote proxies
     # ------------------------------------------------------------------
 
-    async def get_interface(
-        self, busname: str, pathname: str, ifname: str
-    ) -> object:
-        """Introspect a remote bus and return a proxy interface.
+    async def get_interface(self, busname: str, pathname: str, ifname: str) -> object:
+        """Return a proxy interface for a remote bus.
+
+        The proxy object is cached per (busname, pathname) so repeated calls do
+        not re-introspect (REQ-DBUS-013).
 
         Args:
             busname: Remote bus name.
@@ -150,9 +152,58 @@ class DBusManager:
         Returns:
             A proxy interface object for the requested D-Bus interface.
         """
-        introspection = await self.bus.introspect(busname, pathname)
-        obj = self.bus.get_proxy_object(busname, pathname, introspection)
+        key = (busname, pathname)
+        obj = self._proxy_cache.get(key)
+        if obj is None:
+            introspection = await self.bus.introspect(busname, pathname)
+            obj = self.bus.get_proxy_object(busname, pathname, introspection)
+            self._proxy_cache[key] = obj
         return obj.get_interface(ifname)
+
+    # ------------------------------------------------------------------
+    # introspection (REQ-DBUS-013)
+    # ------------------------------------------------------------------
+
+    async def introspect(self, busname: str, pathname: str) -> BusIntrospect:
+        """Return a ``BusIntrospect`` snapshot of a single object path.
+
+        Reuses the underlying library's introspection result (no data is
+        discarded).
+        """
+        node = await self.bus.introspect(busname, pathname)
+        return BusIntrospect(node.tostring(), path=pathname)
+
+    async def introspect_tree(self, busname: str, pathname: str) -> dict[str, BusIntrospect]:
+        """Recursively introspect a service's object tree.
+
+        Walks the child nodes under *pathname* and returns
+        ``{path: BusIntrospect}`` for every discovered object path. The result
+        is cached per friend bus name and invalidated when the friend
+        disappears (REQ-DBUS-013).
+        """
+        if busname in self._introspect_cache:
+            return self._introspect_cache[busname]
+
+        tree: dict[str, BusIntrospect] = {}
+        to_visit = [pathname]
+        seen: set[str] = set()
+        while to_visit:
+            path = to_visit.pop()
+            if path in seen:
+                continue
+            seen.add(path)
+            try:
+                snapshot = await self.introspect(busname, path)
+            except Exception:
+                self.logger.warning("DBus: introspect_tree failed for %s path %s", busname, path)
+                continue
+            tree[path] = snapshot
+            for child in snapshot.children():
+                if child not in seen:
+                    to_visit.append(child)
+
+        self._introspect_cache[busname] = tree
+        return tree
 
     # ------------------------------------------------------------------
     # friend bus discovery
@@ -178,9 +229,7 @@ class DBusManager:
                 len(retval),
             )
         except Exception:
-            self.logger.exception(
-                "Unable to update friendbus: DBus ListNames exception"
-            )
+            self.logger.exception("Unable to update friendbus: DBus ListNames exception")
 
     def query_friend_busname(self, query: str = "") -> list[str]:
         """Return friend bus names, optionally filtered by substring.
@@ -219,9 +268,7 @@ class DBusManager:
             ifname = busname.partition("-")[0]
         if objpath is None:
             objpath = self._obj_root
-        return await self.get_interface(
-            busname=busname, pathname=objpath, ifname=ifname
-        )
+        return await self.get_interface(busname=busname, pathname=objpath, ifname=ifname)
 
     async def wait_friend_changes(self) -> None:
         """Await until the friend set changes."""
@@ -256,12 +303,14 @@ class DBusManager:
         """Handle ``NameLost`` — remove from friend set if the name shares our prefix."""
         if name.startswith(self._bus_prefix):
             self.friendbus.discard(name)
+            # invalidate per-friend introspection/proxy caches (REQ-DBUS-013)
+            self._introspect_cache.pop(name, None)
+            for key in [k for k in self._proxy_cache if k[0] == name]:
+                self._proxy_cache.pop(key, None)
             self.logger.debug("Detected missing friend service: %s", name)
             self.friendchanges.set()
 
-    def _signal_name_owner_changed(
-        self, name: str, old_owner: str, new_owner: str
-    ) -> None:
+    def _signal_name_owner_changed(self, name: str, old_owner: str, new_owner: str) -> None:
         """Handle ``NameOwnerChanged`` — delegate to ``_signal_name_acquired``
         or ``_signal_name_lost`` depending on whether the owner appeared or
         disappeared."""

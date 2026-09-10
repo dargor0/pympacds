@@ -112,7 +112,8 @@ from pympacds.contracts import ServiceContract, dbus_method, dbus_signal
 class MyContract(ServiceContract):
     iface_name = "MyInterface"
     iface_version = "1.0.0"
-    contract_type = "my-domain"
+    iface_provides = ["my-domain"]
+    iface_requires = []
 
     def __init__(self, ifname, base):
         super().__init__(ifname, base)

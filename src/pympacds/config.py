@@ -32,9 +32,7 @@ class ConfigManager:
         with open(path, "w") as f:
             cp.write(f)
 
-    def validate(
-        self, cp: configparser.ConfigParser, strict: bool = False
-    ) -> list[str]:
+    def validate(self, cp: configparser.ConfigParser, strict: bool = False) -> list[str]:
         """Validate a ConfigParser against the schema file.
 
         Args:
@@ -55,66 +53,71 @@ class ConfigManager:
             return errors
 
         for section, spec in schema.items():
-            if section in ("DEFAULT", "dbus"):
-                continue
-            if not cp.has_section(section):
-                continue
-            required = spec.get("required", [])
-            keys = spec.get("keys", {})
-            for rk in required:
-                if rk not in cp[section]:
-                    errors.append(f"{section}.{rk}: required key is missing")
-            for kname, kspec in keys.items():
-                if kname not in cp[section]:
-                    if "default" in kspec:
-                        cp[section][kname] = str(kspec["default"])
-                    continue
-                val = cp[section][kname]
-                ktype = kspec.get("type", "str")
-                if ktype == "int":
-                    try:
-                        ival = int(val)
-                        if "min" in kspec and ival < kspec["min"]:
-                            errors.append(
-                                f"{section}.{kname}: {ival} < min {kspec['min']}"
-                            )
-                        if "max" in kspec and ival > kspec["max"]:
-                            errors.append(
-                                f"{section}.{kname}: {ival} > max {kspec['max']}"
-                            )
-                    except ValueError:
-                        errors.append(
-                            f"{section}.{kname}: expected int, got '{val}'"
-                        )
-                elif ktype == "float":
-                    try:
-                        fval = float(val)
-                        if "min" in kspec and fval < kspec["min"]:
-                            errors.append(
-                                f"{section}.{kname}: {fval} < min {kspec['min']}"
-                            )
-                        if "max" in kspec and fval > kspec["max"]:
-                            errors.append(
-                                f"{section}.{kname}: {fval} > max {kspec['max']}"
-                            )
-                    except ValueError:
-                        errors.append(
-                            f"{section}.{kname}: expected float, got '{val}'"
-                        )
-                elif ktype == "bool":
-                    try:
-                        cp.getboolean(section, kname)
-                    except ValueError:
-                        errors.append(
-                            f"{section}.{kname}: expected bool, got '{val}'"
-                        )
-                elif ktype == "str" and "pattern" in kspec:
-                    import re
-
-                    if not re.match(kspec["pattern"], val):
-                        errors.append(
-                            f"{section}.{kname}: '{val}' does not match "
-                            f"pattern '{kspec['pattern']}'"
-                        )
-
+            self._validate_section(section, spec, cp, errors)
         return errors
+
+    def _validate_section(self, section: str, spec: dict, cp, errors: list[str]) -> None:
+        if section in ("DEFAULT", "dbus"):
+            return
+        if not cp.has_section(section):
+            return
+        self._check_required(section, spec, cp, errors)
+        for kname, kspec in spec.get("keys", {}).items():
+            if kname not in cp[section]:
+                if "default" in kspec:
+                    cp[section][kname] = str(kspec["default"])
+                continue
+            self._check_key(section, kname, cp[section][kname], kspec, cp, errors)
+
+    def _check_required(self, section: str, spec: dict, cp, errors: list[str]) -> None:
+        for rk in spec.get("required", []):
+            if rk not in cp[section]:
+                errors.append(f"{section}.{rk}: required key is missing")
+
+    def _check_key(self, section, kname, val, kspec, cp, errors: list[str]) -> None:
+        ktype = kspec.get("type", "str")
+        if ktype == "int":
+            self._check_int(section, kname, val, kspec, errors)
+        elif ktype == "float":
+            self._check_float(section, kname, val, kspec, errors)
+        elif ktype == "bool":
+            self._check_bool(section, kname, val, cp, errors)
+        elif ktype == "str" and "pattern" in kspec:
+            self._check_pattern(section, kname, val, kspec, errors)
+
+    def _check_int(self, section, kname, val, kspec, errors: list[str]) -> None:
+        try:
+            ival = int(val)
+        except ValueError:
+            errors.append(f"{section}.{kname}: expected int, got '{val}'")
+            return
+        if "min" in kspec and ival < kspec["min"]:
+            errors.append(f"{section}.{kname}: {ival} < min {kspec['min']}")
+        if "max" in kspec and ival > kspec["max"]:
+            errors.append(f"{section}.{kname}: {ival} > max {kspec['max']}")
+
+    def _check_float(self, section, kname, val, kspec, errors: list[str]) -> None:
+        try:
+            fval = float(val)
+        except ValueError:
+            errors.append(f"{section}.{kname}: expected float, got '{val}'")
+            return
+        if "min" in kspec and fval < kspec["min"]:
+            errors.append(f"{section}.{kname}: {fval} < min {kspec['min']}")
+        if "max" in kspec and fval > kspec["max"]:
+            errors.append(f"{section}.{kname}: {fval} > max {kspec['max']}")
+
+    def _check_bool(self, section, kname, val, cp, errors: list[str]) -> None:
+        try:
+            cp.getboolean(section, kname)
+        except ValueError:
+            errors.append(f"{section}.{kname}: expected bool, got '{val}'")
+
+    def _check_pattern(self, section, kname, val, kspec, errors: list[str]) -> None:
+        import re
+
+        if not re.match(kspec["pattern"], val):
+            errors.append(
+                f"{section}.{kname}: '{val}' does not match "
+                f"pattern '{kspec['pattern']}'"
+            )

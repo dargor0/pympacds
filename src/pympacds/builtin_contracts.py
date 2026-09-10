@@ -19,7 +19,7 @@ class HealthContract(ServiceContract):
 
     iface_name = "Health"
     iface_version = "1.0.0"
-    contract_type = "health"
+    iface_provides = ["health"]
 
     def __init__(self, ifname: str, base):
         super().__init__(ifname, base)
@@ -27,6 +27,8 @@ class HealthContract(ServiceContract):
             "dbus_health_ping",
             "dbus_health_status",
             "dbus_health_get_uptime",
+            "dbus_health_get_provides",
+            "dbus_health_get_requires",
         )
 
     @dbus_method()
@@ -45,6 +47,14 @@ class HealthContract(ServiceContract):
     def uptime(self) -> "u":
         return self.base.dbus_health_get_uptime()
 
+    @dbus_property(access=_PropertyAccess.READ)
+    def provides(self) -> "as":
+        return self.base.dbus_health_get_provides()
+
+    @dbus_property(access=_PropertyAccess.READ)
+    def requires(self) -> "as":
+        return self.base.dbus_health_get_requires()
+
 
 class LifecycleContract(ServiceContract):
     """Remote restart and shutdown.
@@ -54,7 +64,7 @@ class LifecycleContract(ServiceContract):
 
     iface_name = "Lifecycle"
     iface_version = "1.0.0"
-    contract_type = "lifecycle"
+    iface_provides = ["lifecycle"]
 
     def __init__(self, ifname: str, base):
         super().__init__(ifname, base)
@@ -84,7 +94,7 @@ class ConfigContract(ServiceContract):
 
     iface_name = "Config"
     iface_version = "1.0.0"
-    contract_type = "config"
+    iface_provides = ["config"]
 
     def __init__(self, ifname: str, base):
         super().__init__(ifname, base)
@@ -114,7 +124,7 @@ class MetricsContract(ServiceContract):
 
     iface_name = "Metrics"
     iface_version = "1.0.0"
-    contract_type = "metrics"
+    iface_provides = ["metrics"]
 
     def __init__(self, ifname: str, base):
         super().__init__(ifname, base)

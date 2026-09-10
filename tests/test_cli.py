@@ -4,9 +4,7 @@ import subprocess
 import sys
 import os
 
-_PKG_DIR = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "src")
-)
+_PKG_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
 
 
 def _run_cli(*args):
@@ -17,7 +15,9 @@ def _run_cli(*args):
         env["PYTHONPATH"] = _PKG_DIR
     return subprocess.run(
         [sys.executable, "-m", "pympacds.cli", *args],
-        capture_output=True, text=True, env=env,
+        capture_output=True,
+        text=True,
+        env=env,
     )
 
 
@@ -54,6 +54,8 @@ def test_cli_config_help():
 def test_cli_list():
     r = _run_cli("list")
     assert r.returncode == 0
+
+
 """Direct unit tests for CLI helper functions."""
 
 import os

@@ -24,7 +24,8 @@ class ServiceContract(_SvcInterface):
 
     iface_name: str = ""
     iface_version: str = "1.0.0"
-    contract_type: str = "generic"
+    iface_provides: list[str] = []
+    iface_requires: list[str] = []
 
     def __init__(self, ifname: str, base):
         super().__init__(ifname)
@@ -55,7 +56,8 @@ class ServiceContract(_SvcInterface):
         return {
             "iface_name": cls.iface_name,
             "iface_version": cls.iface_version,
-            "contract_type": cls.contract_type,
+            "provides": list(cls.iface_provides),
+            "requires": list(cls.iface_requires),
         }
 
 
