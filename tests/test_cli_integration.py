@@ -1,12 +1,10 @@
 """CLI integration tests — subprocess for help, direct import for logic."""
 
 import configparser
-import json
 import os
 import subprocess
 import sys
-import pytest
-import tempfile
+
 import pytest
 
 _PKG_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))

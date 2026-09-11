@@ -1,8 +1,8 @@
 """Unit tests for DBusManager (no real bus required)."""
 
-import asyncio
 import logging
 import queue
+
 import pytest
 
 from pympacds.dbus import DBusManager

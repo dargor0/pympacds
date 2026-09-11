@@ -73,7 +73,7 @@ class Rule:
     argmap: list | None = None
     queue_size: int = 1000
     active: bool = False
-    queue: asyncio.Queue = field(default=None, repr=False)
+    queue: asyncio.Queue | None = field(default=None, repr=False)
     subscriptions: list = field(default_factory=list, repr=False)
     pending: list = field(default_factory=list, repr=False)
 
@@ -453,9 +453,11 @@ class SignalActionMiddleware(MiddlewareBase):
         """Return ``[(busname, path, interface, arg_names), ...]``."""
         t = rule.trigger
         if t.kind == "tag":
+            assert t.capability is not None
             friends = await self._friends_by_tag(t.capability)
             iface_filter = None
         else:
+            assert t.busname is not None
             friends = [self._resolve_friend(t.busname)]
             iface_filter = t.interface
 
@@ -479,6 +481,7 @@ class SignalActionMiddleware(MiddlewareBase):
         """Return ``[(busname, path, interface, method_dict), ...]``."""
         a = rule.action
         if a.kind == "tag":
+            assert a.capability is not None
             friends = await self._friends_by_tag(a.capability)
             targets = []
             for busname in friends:
@@ -492,6 +495,7 @@ class SignalActionMiddleware(MiddlewareBase):
                     for iface, m in bi.find_method(a.method):
                         targets.append((busname, path, iface, m))
             return targets
+        assert a.busname is not None
         return [(self._resolve_friend(a.busname), a.object_path, a.interface, None)]
 
     # -- subscription management (REQ-MIDW-006/008) --------------------
@@ -500,7 +504,7 @@ class SignalActionMiddleware(MiddlewareBase):
         def callback(*values):
             event = SignalEvent(
                 list(values),
-                dict(zip(arg_names, values)) if arg_names else {},
+                dict(zip(arg_names, values, strict=False)) if arg_names else {},
             )
             self._enqueue(rule, event)
 
@@ -584,6 +588,7 @@ class SignalActionMiddleware(MiddlewareBase):
     # -- dispatch (REQ-MIDW-009/010) -----------------------------------
 
     def _enqueue(self, rule: Rule, event: SignalEvent) -> None:
+        assert rule.queue is not None
         try:
             rule.queue.put_nowait(event)
         except asyncio.QueueFull:
@@ -597,6 +602,7 @@ class SignalActionMiddleware(MiddlewareBase):
                 pass
 
     async def _dispatch_loop(self, rule: Rule) -> None:
+        assert rule.queue is not None
         try:
             while True:
                 event = await rule.queue.get()

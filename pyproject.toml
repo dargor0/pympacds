@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pympacds"
-version = "0.2.0"
+version = "0.2.1"
 description = "Python Multi Process Asyncio-based Cooperative Discoverable Services Framework"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -85,6 +85,12 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "pympacds.builtin_contracts"
 disable_error_code = ["name-defined", "valid-type"]
+
+# The base class is resolved dynamically from the D-Bus library, so its type is
+# not known statically (dynamic base class).
+[[tool.mypy.overrides]]
+module = "pympacds.contracts"
+disable_error_code = ["valid-type", "misc"]
 
 [[tool.mypy.overrides]]
 module = "pympacds.signal_action"

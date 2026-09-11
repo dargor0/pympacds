@@ -2,8 +2,9 @@
 
 import asyncio
 import logging
+from typing import Any
 
-from . import get_dbus_lib, get_dbus_aio, get_dbus_service
+from . import get_dbus_aio, get_dbus_lib, get_dbus_service
 from .introspect import BusIntrospect
 
 _DEFAULT_BUS_PREFIX = "org.pympacds"
@@ -40,9 +41,9 @@ class DBusManager:
         discovery_enabled: bool = True,
     ):
         self.logger = logger
-        self._lib: object = get_dbus_lib()
-        self._aio: object = get_dbus_aio()
-        self._svc: object = get_dbus_service()
+        self._lib: Any = get_dbus_lib()
+        self._aio: Any = get_dbus_aio()
+        self._svc: Any = get_dbus_service()
 
         self._bus_prefix: str = bus_prefix or _DEFAULT_BUS_PREFIX
 
@@ -64,14 +65,14 @@ class DBusManager:
         self.friendbus: set[str] = set()
         self.friendchanges: asyncio.Event = asyncio.Event()
 
-        self.bus: object = self._aio.MessageBus(bus_type=self._bus_type)
-        self._dbusif: object | None = None
+        self.bus: Any = self._aio.MessageBus(bus_type=self._bus_type)
+        self._dbusif: Any = None
         self._obj_root: str = _prefix_to_path(self._bus_prefix)
         self._started: bool = False
 
         # per-friend caches (REQ-DBUS-013): introspection snapshots and proxies
         self._introspect_cache: dict[str, dict[str, BusIntrospect]] = {}
-        self._proxy_cache: dict[tuple[str, str], object] = {}
+        self._proxy_cache: dict[tuple[str, str], Any] = {}
 
         self.logger.debug(f"DBus ({self.busname}) initialized.")
 
@@ -79,7 +80,7 @@ class DBusManager:
     # interface registration
     # ------------------------------------------------------------------
 
-    def add_interface(self, pathname: str, iface: object) -> None:
+    def add_interface(self, pathname: str, iface: Any) -> None:
         """Register a D-Bus interface on an object path.
 
         Args:

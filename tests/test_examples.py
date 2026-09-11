@@ -5,7 +5,6 @@ import signal
 import subprocess
 import sys
 import time
-import pytest
 
 _EXAMPLES = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "examples"))
 _PKG_SRC = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))

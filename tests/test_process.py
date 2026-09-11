@@ -2,7 +2,14 @@
 
 import asyncio
 import configparser
+import json
+import os
+import sys
+import textwrap
+
 import pytest
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 
 class TestProcessBaseConstruction:
@@ -177,11 +184,6 @@ class TestMiddlewareIntegration:
 
 """Tests for process.py lifecycle — middleware, start(), schema validation."""
 
-import configparser
-import os
-import textwrap
-import pytest
-
 
 class TestStartMethod:
     def test_start_runs_setup_and_event_loop(self, ini_file, monkeypatch):
@@ -240,7 +242,6 @@ class TestStartMethod:
 
 class TestUserSchemaValidation:
     def test_validate_with_schema_file(self, tmp_path, ini_file):
-        import json
         from pympacds.process import ProcessBase
 
         schema_path = tmp_path / "schema.json"
@@ -260,7 +261,6 @@ class TestUserSchemaValidation:
         assert p.setup(["-c", ini_file]) is True
 
     def test_validate_user_schema_disabled(self, tmp_path, ini_file):
-        import json
         from pympacds.process import ProcessBase
 
         schema_path = tmp_path / "schema.json"
@@ -288,8 +288,6 @@ class TestMiddlewareDiscovery:
 
     def test_init_middleware_with_entry_point(self, process_base, tmp_path, monkeypatch):
         """Test middleware discovery using a fake entry point."""
-        import sys
-
         # Create a fake module with a middleware class
         mod_path = tmp_path / "fake_mw.py"
         mod_path.write_text(
@@ -338,8 +336,6 @@ class TestMiddlewareDiscovery:
 
     def test_programmatic_middleware_singleton(self, process_base, tmp_path, monkeypatch):
         """Programmatic middleware + matching [middleware] entry → one instance."""
-        import sys
-        import textwrap
         from pympacds.middleware import MiddlewareSpec
 
         mod_path = tmp_path / "prog_mw.py"
@@ -353,6 +349,7 @@ class TestMiddlewareDiscovery:
         sys.path.insert(0, str(tmp_path))
         try:
             import importlib.metadata
+
             from prog_mw import ProgMiddleware
 
             class FakeEntryPoint:
@@ -387,15 +384,6 @@ class TestMiddlewareDiscovery:
 
 
 """Push process.py over 80% with direct asyncio tests."""
-
-import asyncio
-import configparser
-import json
-import os
-import sys
-import pytest
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 
 class MockBus:
@@ -490,7 +478,6 @@ class TestDirectLifecycle:
 
 class TestSchemaFileConfig:
     def test_schema_file_from_config(self, ini_file, tmp_path):
-        import json
         from pympacds.process import ProcessBase
 
         schema = tmp_path / "s.json"
@@ -508,7 +495,6 @@ class TestSchemaFileConfig:
         assert p._schema_file == str(schema)
 
     def test_schema_file_none_when_disabled(self, ini_file, tmp_path):
-        import json
         from pympacds.process import ProcessBase
 
         schema = tmp_path / "s.json"
@@ -527,40 +513,6 @@ class TestSchemaFileConfig:
 
 
 """Direct asyncio tests for the remaining process.py uncovered lines."""
-
-import asyncio
-import pytest
-import sys, os
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
-
-
-class MockBus:
-    async def connect(self):
-        return self
-
-    async def request_name(self, *a):
-        pass
-
-    async def stop(self):
-        pass
-
-    def disconnect(self):
-        pass
-
-    async def wait_for_disconnect(self):
-        pass
-
-    @property
-    def _writer(self):
-        class W:
-            class M:
-                def __len__(self):
-                    return 0
-
-            messages = M()
-
-        return W()
 
 
 @pytest.mark.asyncio

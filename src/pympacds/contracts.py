@@ -2,12 +2,13 @@
 
 import inspect
 import logging
+from typing import Any
 
 from . import get_dbus_service
 
 _logger = logging.getLogger(__name__)
 
-_SvcInterface = get_dbus_service().ServiceInterface
+_SvcInterface: Any = get_dbus_service().ServiceInterface
 
 
 class ServiceContract(_SvcInterface):
@@ -92,8 +93,8 @@ def dbus_method(
 
         if inspect.iscoroutinefunction(fn) and timeout_ms > 0:
             original = getattr(decorated, "__wrapped__", decorated)
-            setattr(decorated, "_pympacds_timeout_ms", timeout_ms)
-            setattr(decorated, "_pympacds_original_fn", original)
+            decorated._pympacds_timeout_ms = timeout_ms
+            decorated._pympacds_original_fn = original
 
         return decorated
 

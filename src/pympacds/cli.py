@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import textwrap
+from typing import Any
 
 
 def main() -> None:
@@ -555,13 +556,13 @@ def _cmd_list(args) -> None:
 # ------------------------------------------------------------------
 
 
-def _validate_builtin(cp: object) -> list[str]:
+def _validate_builtin(cp: Any) -> list[str]:
     """Validate built-in [DEFAULT] and [dbus] keys. Returns list of error strings."""
     return _validate_default(cp) + _validate_dbus(cp)
 
 
-def _validate_default(cp: object) -> list[str]:
-    errors = []
+def _validate_default(cp: Any) -> list[str]:
+    errors: list[str] = []
     d = cp["DEFAULT"]
     lvl = d.get("loglevel", "WARN").upper()
     if lvl not in {"DEBUG", "INFO", "WARN", "WARNING", "ERROR", "CRITICAL"}:
@@ -585,8 +586,8 @@ def _validate_default(cp: object) -> list[str]:
     return errors
 
 
-def _validate_dbus(cp: object) -> list[str]:
-    errors = []
+def _validate_dbus(cp: Any) -> list[str]:
+    errors: list[str] = []
     if not cp.has_section("dbus"):
         return errors
     d = cp["dbus"]

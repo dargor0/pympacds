@@ -1,6 +1,5 @@
 """Tests for service_discovery.py (REQ-DISC)."""
 
-import asyncio
 import pytest
 
 

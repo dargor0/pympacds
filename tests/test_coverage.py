@@ -5,6 +5,7 @@ import configparser
 import json
 import os
 import sys
+
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
@@ -168,8 +169,8 @@ async def test_do_waitexit_timeout_ok(process_base):
 
 @pytest.mark.asyncio
 async def test_middleware_setup_continue(ini_file):
-    from pympacds.process import ProcessBase
     from pympacds.middleware import MiddlewareBase
+    from pympacds.process import ProcessBase
 
     class TMW(MiddlewareBase):
         async def setup(self):
@@ -195,8 +196,8 @@ async def test_middleware_setup_continue(ini_file):
 
 @pytest.mark.asyncio
 async def test_middleware_setup_abort(ini_file):
-    from pympacds.process import ProcessBase
     from pympacds.middleware import MiddlewareBase
+    from pympacds.process import ProcessBase
 
     class SMW(MiddlewareBase):
         async def setup(self):
@@ -218,8 +219,8 @@ async def test_middleware_setup_abort(ini_file):
 
 @pytest.mark.asyncio
 async def test_middleware_teardown(ini_file):
-    from pympacds.process import ProcessBase
     from pympacds.middleware import MiddlewareBase, MiddlewareSpec
+    from pympacds.process import ProcessBase
 
     calls = []
 
@@ -359,8 +360,9 @@ def test_logstdout_and_file(ini_file, tmp_path):
 
 
 def test_logfile_fallback_tmp(ini_file, monkeypatch):
-    from pympacds.process import ProcessBase
     import logging.handlers
+
+    from pympacds.process import ProcessBase
 
     logf = "/root/nope/app.log"
     cp = configparser.ConfigParser()

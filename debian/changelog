@@ -1,3 +1,10 @@
+pympacds (0.2.1-1) unstable; urgency=medium
+
+  * Fix ruff lint issues (import ordering, unused/duplicate imports, bugbear).
+  * Fix mypy type-check errors across the framework.
+
+ -- Oscar Diaz <odiaz@ieee.org>  Thu, 10 Sep 2026 18:57:12 -0500
+
 pympacds (0.2.0-1) unstable; urgency=medium
 
   * Add signal_action middleware.

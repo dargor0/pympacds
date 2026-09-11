@@ -4,8 +4,8 @@
 - LifecycleContract, ConfigContract, MetricsContract (opt-in via [dbus] INI)
 """
 
-from .contracts import ServiceContract, dbus_method, dbus_signal, dbus_property
 from . import get_dbus_lib
+from .contracts import ServiceContract, dbus_method, dbus_property, dbus_signal
 
 _PropertyAccess = get_dbus_lib().PropertyAccess
 
