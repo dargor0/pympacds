@@ -1,4 +1,10 @@
-pympacds-http (0.1.0-1) unstable; urgency=medium
+pympacds-http (0.1.1-1) UNRELEASED; urgency=medium
+
+  * Depend on python3-pympacds >= 0.3.0 (uses health_status_dict()).
+
+ -- Oscar Diaz <odiaz@ieee.org>  Mon, 12 Oct 2026 21:46:27 -0500
+
+pympacds-http (0.1.0-1) UNRELEASED; urgency=medium
 
   * Initial Debian packaging.
   * HTTP client service with aiohttp and fire-and-forget request tokens.

@@ -1,4 +1,4 @@
-pympacds (0.3.0-1) unstable; urgency=medium
+pympacds (0.3.0-1) UNRELEASED; urgency=medium
 
   * Add real-time configuration support: parsing and validation,
     in-process application, systemd drop-in generation, read-back
@@ -6,14 +6,14 @@ pympacds (0.3.0-1) unstable; urgency=medium
 
  -- Oscar Diaz <odiaz@ieee.org>  Mon, 12 Oct 2026 19:37:54 -0500
 
-pympacds (0.2.1-1) unstable; urgency=medium
+pympacds (0.2.1-1) UNRELEASED; urgency=medium
 
   * Fix ruff lint issues (import ordering, unused/duplicate imports, bugbear).
   * Fix mypy type-check errors across the framework.
 
  -- Oscar Diaz <odiaz@ieee.org>  Thu, 10 Sep 2026 18:57:12 -0500
 
-pympacds (0.2.0-1) unstable; urgency=medium
+pympacds (0.2.0-1) UNRELEASED; urgency=medium
 
   * Add signal_action middleware.
   * Add middleware instance access (get_middleware).
@@ -23,7 +23,7 @@ pympacds (0.2.0-1) unstable; urgency=medium
 
  -- Oscar Diaz <odiaz@ieee.org>  Wed, 10 Sep 2026 11:27:16 -0500
 
-pympacds (0.1.0-1) unstable; urgency=medium
+pympacds (0.1.0-1) UNRELEASED; urgency=medium
 
   * Initial release.
 

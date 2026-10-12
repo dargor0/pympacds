@@ -3,6 +3,57 @@ set -e
 
 . /usr/share/debconf/confmodule
 
+# True (0) if a Python D-Bus backend (dbus-fast or dbus-next) is available,
+# either as a Debian package or importable (pip / virtualenv).  The backend is
+# only a Recommends, so it may legitimately be missing on distributions whose
+# archive does not carry it (e.g. Ubuntu 22.04 / Mint 21).
+_pympacds_has_dbus_backend() {
+    if command -v dpkg-query >/dev/null 2>&1; then
+        if dpkg-query -W -f='${db:Status-Abbrev}' python3-dbus-fast 2>/dev/null \
+            | grep -q '^ii'; then
+            return 0
+        fi
+        if dpkg-query -W -f='${db:Status-Abbrev}' python3-dbus-next 2>/dev/null \
+            | grep -q '^ii'; then
+            return 0
+        fi
+    fi
+    if command -v python3 >/dev/null 2>&1; then
+        if python3 -c 'import dbus_fast' 2>/dev/null; then
+            return 0
+        fi
+        if python3 -c 'import dbus_next' 2>/dev/null; then
+            return 0
+        fi
+    fi
+    return 1
+}
+
+_pympacds_warn_no_dbus_backend() {
+    cat >&2 <<'EOF'
+pympacds: no D-Bus backend is installed. pympacds services cannot start
+without either 'dbus-fast' or 'dbus-next'. Install ONE of them:
+
+  * From your distribution archive, if it provides one:
+        sudo apt install python3-dbus-fast
+    or  sudo apt install python3-dbus-next
+    NOTE: some distributions/releases ship neither package -- e.g. Ubuntu
+    22.04 and Linux Mint 21 -- in which case apt will fail; use another option.
+
+  * Manually, from a .deb file you already have:
+        sudo apt install ./python3-dbus-fast_*.deb    # or: sudo dpkg -i ...
+        sudo apt -f install                           # fix any dependencies
+
+  * With pip:
+        pip install dbus-fast      # or: pip install dbus-next
+    WARNING: pip installs are NOT managed by apt. apt cannot track, upgrade or
+    remove such a package, and it may not be visible to the system Python
+    (virtualenv, /usr/local, etc.).
+
+Then restart the affected services (e.g. systemctl restart pympacds-<name>).
+EOF
+}
+
 case "$1" in
     configure)
         db_get pympacds/bus-prefix || true
@@ -13,6 +64,10 @@ case "$1" in
 
         if command -v pympacds-admin >/dev/null 2>&1; then
             pympacds-admin setup --bus-prefix "$BUS_PREFIX"
+        fi
+
+        if ! _pympacds_has_dbus_backend; then
+            _pympacds_warn_no_dbus_backend
         fi
         ;;
 esac

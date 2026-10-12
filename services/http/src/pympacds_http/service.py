@@ -378,15 +378,7 @@ class HttpService(ProcessBase):
         return True
 
     def dbus_health_status(self) -> str:
-        return json.dumps(
-            {
-                "name": self.name,
-                "version": self.version,
-                "uptime": self.dbus_health_get_uptime(),
-                "provides": self.dbus_health_get_provides(),
-                "requires": self.dbus_health_get_requires(),
-            }
-        )
+        return json.dumps(self.health_status_dict())
 
     def dbus_health_get_uptime(self) -> int:
         return int(time.time() - self._start_time)
