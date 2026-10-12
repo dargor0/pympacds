@@ -1,3 +1,11 @@
+pympacds (0.3.0-1) unstable; urgency=medium
+
+  * Add real-time configuration support: parsing and validation,
+    in-process application, systemd drop-in generation, read-back
+    verification and status reporting, plus documentation.
+
+ -- Oscar Diaz <odiaz@ieee.org>  Mon, 12 Oct 2026 19:37:54 -0500
+
 pympacds (0.2.1-1) unstable; urgency=medium
 
   * Fix ruff lint issues (import ordering, unused/duplicate imports, bugbear).

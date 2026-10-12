@@ -14,16 +14,17 @@ The framework reads the file in `ProcessBase.setup()` using `configparser`, then
 
 ## Sections
 
-The INI file uses three reserved section names plus any number of service-specific sections:
+The INI file uses four reserved section names plus any number of service-specific sections:
 
 | Section | Purpose |
 |---------|---------|
 | `[DEFAULT]` | Framework-level settings (logging) |
 | `[dbus]` | D-Bus transport and built-in contract configuration |
-| `[middleware]` | Activation of optional middleware extensions |
+| `[middleware]` | Activation of optional middleware extensions (see [Middleware](middleware.md)) |
+| `[rt]` | Optional soft real-time tuning (see [Real-Time Configuration](real-time.md)) |
 | `[<anything-else>]` | Service-specific configuration, fully under the developer's control |
 
-`[DEFAULT]` and `[dbus]` are validated by the framework.  All other sections are passed through untouched (optionally validated against a schema — see *Schema Validation*).
+`[DEFAULT]`, `[dbus]`, and `[rt]` are validated by the framework. `[rt]` validation is **warning-only**: an invalid value is logged and dropped, and never prevents the service from starting.  All other sections are passed through untouched (optionally validated against a schema — see *Schema Validation*).
 
 ---
 
@@ -139,7 +140,7 @@ PYMPACDS_DEFAULT_LOGLEVEL=DEBUG PYMPACDS_DBUS_BUS_TYPE=session \
 
 ## Schema Validation
 
-In addition to the built-in validation of `[DEFAULT]` and `[dbus]`, a service may validate its own sections against a JSON schema file.
+In addition to the built-in validation of `[DEFAULT]`, `[dbus]`, and `[rt]`, a service may validate its own sections against a JSON schema file.
 
 ```json
 {
