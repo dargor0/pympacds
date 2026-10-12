@@ -1,12 +1,15 @@
 """pympacds-admin — CLI administration tool."""
 
 import argparse
+import configparser
 import os
 import shutil
 import subprocess
 import sys
 import textwrap
 from typing import Any
+
+from . import realtime
 
 
 def main() -> None:
@@ -24,6 +27,9 @@ def main() -> None:
     # install
     sp_install = sub.add_parser("install", help="Install a service (systemd + D-Bus)")
     sp_install.add_argument("service_name", help="Name of the service to install")
+    sp_install.add_argument(
+        "-c", "--config", default="", help="Service INI file (used for the [rt] section)"
+    )
     sp_install.add_argument("--no-enable", action="store_true", help="Skip systemctl enable")
     sp_install.add_argument("--start", action="store_true", help="Start the service after install")
     sp_install.add_argument("--dry-run", action="store_true", help="Print paths only")
@@ -191,24 +197,146 @@ def _cmd_install(args) -> None:
     if args.dry_run:
         print(f"Service unit: {unit_src}")
         print(f"DBus policy:  {conf_src}")
-        return
 
     unit_dst = f"/etc/systemd/system/pympacds-{service_name}.service"
     conf_dst = f"/etc/dbus-1/system.d/{service_name}.conf"
 
-    shutil.copy(unit_src, unit_dst)
-    print(f"Installed: {unit_dst}")
+    if not args.dry_run:
+        shutil.copy(unit_src, unit_dst)
+        print(f"Installed: {unit_dst}")
 
-    if os.path.exists(conf_src):
-        shutil.copy(conf_src, conf_dst)
-        print(f"Installed: {conf_dst}")
-        _run(["pkill", "-HUP", "dbus-daemon"], check=False)
+        if os.path.exists(conf_src):
+            shutil.copy(conf_src, conf_dst)
+            print(f"Installed: {conf_dst}")
+            _run(["pkill", "-HUP", "dbus-daemon"], check=False)
 
-    _run(["systemctl", "daemon-reload"])
-    if not args.no_enable:
-        _run(["systemctl", "enable", f"pympacds-{service_name}"])
-    if args.start:
-        _run(["systemctl", "start", f"pympacds-{service_name}"])
+    # real-time drop-in (REQ-RT-004); strict, fail-closed
+    rt_failed = _install_realtime(service_name, args, dry_run=args.dry_run)
+
+    if not args.dry_run:
+        _run(["systemctl", "daemon-reload"])
+        if not args.no_enable:
+            _run(["systemctl", "enable", f"pympacds-{service_name}"])
+        if args.start:
+            _run(["systemctl", "start", f"pympacds-{service_name}"])
+
+    if rt_failed:
+        sys.exit(1)
+
+
+def _install_realtime(service_name: str, args: Any, dry_run: bool) -> bool:
+    """Generate/remove the RT drop-in from the service's ``[rt]`` section.
+
+    Returns True when a requested RT configuration was disabled because of
+    validation errors (the caller then exits non-zero).  The service itself is
+    always installed (REQ-RT-004/006).
+    """
+    unit = f"pympacds-{service_name}.service"
+    dropin_dir = f"/etc/systemd/system/{unit}.d"
+    dropin = os.path.join(dropin_dir, "rt.conf")
+
+    cfg, findings = _read_service_rt(service_name, args)
+    for finding in findings:
+        if not finding.is_error:
+            print(f"warning: [rt] {finding.format()}", file=sys.stderr)
+
+    errors = realtime.errors_of(findings)
+    if cfg is None:
+        # no [rt] section: disabling RT is symmetric — drop any stale file
+        _remove_dropin(dropin, dry_run)
+        return False
+
+    if errors:
+        _report_rt_disabled(unit, errors)
+        _remove_dropin(dropin, dry_run, announce=False)
+        return True
+
+    return _write_rt_dropin(unit, dropin, dropin_dir, cfg, dry_run)
+
+
+def _read_service_rt(service_name: str, args: Any) -> tuple[Any, list]:
+    """Read and parse the service's ``[rt]`` section (INI only; no env)."""
+    config_path = getattr(args, "config", "") or f"/etc/pympacds/{service_name}.ini"
+    cp = configparser.ConfigParser()
+    if config_path and os.path.exists(config_path):
+        cp.read(config_path)
+    return realtime.load_rt(cp, environ={})
+
+
+def _write_rt_dropin(
+    unit: str,
+    dropin: str,
+    dropin_dir: str,
+    cfg: Any,
+    dry_run: bool,
+) -> bool:
+    """Write the RT drop-in and verify the unit; return True if RT was disabled."""
+    body = realtime.render_dropin(cfg)
+    if dry_run:
+        print(f"Would write: {dropin}")
+        print(body)
+        return False
+    os.makedirs(dropin_dir, exist_ok=True)
+    with open(dropin, "w") as f:
+        f.write(body)
+    print(f"Installed: {dropin}")
+    if _systemd_analyze_verify(unit) is False:
+        print(
+            f"error: systemd-analyze verify failed for {unit}; removing RT drop-in",
+            file=sys.stderr,
+        )
+        _remove_dropin(dropin, dry_run=False, announce=False)
+        return True
+    return False
+
+
+def _report_rt_disabled(unit: str, errors: list[realtime.Finding]) -> None:
+    """Print the explicit 'RT requested but failed' interface response."""
+    print(
+        f"[rt] found but invalid — RT is DISABLED for {unit}\n"
+        f"(no rt.conf written; the service will run with normal scheduling):",
+        file=sys.stderr,
+    )
+    for err in errors:
+        print(f"  {err.format()}", file=sys.stderr)
+
+
+def _remove_dropin(dropin: str, dry_run: bool, announce: bool = True) -> None:
+    if not os.path.exists(dropin):
+        return
+    if dry_run:
+        if announce:
+            print(f"Would remove: {dropin}")
+        return
+    os.remove(dropin)
+    if announce:
+        print(f"Removed: {dropin}")
+
+
+def _systemd_analyze_verify(unit: str) -> bool | None:
+    """Run ``systemd-analyze verify`` on the installed unit.
+
+    Returns True (ok), False (failed), or None when systemd-analyze is
+    unavailable (e.g. a container without systemd).
+    """
+    try:
+        result = subprocess.run(
+            ["systemd-analyze", "verify", unit],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError:
+        print(
+            "warning: systemd-analyze not available; skipping RT unit verification",
+            file=sys.stderr,
+        )
+        return None
+    if result.returncode != 0:
+        if result.stderr:
+            print(result.stderr.rstrip(), file=sys.stderr)
+        return False
+    return True
 
 
 def _find_resource(filename: str) -> str:
@@ -557,8 +685,14 @@ def _cmd_list(args) -> None:
 
 
 def _validate_builtin(cp: Any) -> list[str]:
-    """Validate built-in [DEFAULT] and [dbus] keys. Returns list of error strings."""
-    return _validate_default(cp) + _validate_dbus(cp)
+    """Validate built-in [DEFAULT], [dbus] and [rt] keys. Returns error strings."""
+    return _validate_default(cp) + _validate_dbus(cp) + _validate_rt(cp)
+
+
+def _validate_rt(cp: Any) -> list[str]:
+    """Validate the [rt] section (strict: errors disable RT, REQ-RT-002/004)."""
+    _cfg, findings = realtime.load_rt(cp, environ={})
+    return [f"[rt] {finding.format()}" for finding in findings if finding.is_error]
 
 
 def _validate_default(cp: Any) -> list[str]:

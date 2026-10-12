@@ -10,6 +10,7 @@ import signal
 import sys
 from typing import TYPE_CHECKING, Any
 
+from . import realtime
 from .dbus import DBusManager
 
 if TYPE_CHECKING:
@@ -52,11 +53,23 @@ class ProcessBase:
         self._validate_user_schema: bool = True
         self._schema_file: str | None = None
 
+        # real-time (REQ-RT-001..012): None when there is no [rt] section
+        self._rt: realtime.RTConfig | None = None
+        self._rt_status: dict[str, Any] | None = None
+
         self.logger = logging.getLogger(f"PID={self.pid} pympacds.{name}")
 
     @property
     def bus_prefix(self) -> str:
         return self._bus_prefix
+
+    @property
+    def rt(self) -> dict[str, Any] | None:
+        """Read-only real-time status (``requested``/``applied``/``verified``).
+
+        ``None`` when no ``[rt]`` section is configured (REQ-RT-003/009).
+        """
+        return self._rt_status
 
     # ------------------------------------------------------------------
     # synchronous setup
@@ -91,6 +104,9 @@ class ProcessBase:
 
         # configure logging
         self._setup_logging()
+
+        # apply + verify real-time settings (REQ-RT-003/009); non-fatal
+        self._init_realtime()
 
         self.logger.debug(
             "Start process %s %s (config file %s)",
@@ -181,6 +197,34 @@ class ProcessBase:
             lf.setLevel(lev)
             lf.setFormatter(ft)
             self.logger.addHandler(lf)
+
+    # ------------------------------------------------------------------
+    # real-time (REQ-RT-001 .. REQ-RT-012)
+    # ------------------------------------------------------------------
+
+    def _init_realtime(self) -> None:
+        """Parse, apply and verify the ``[rt]`` section (non-fatal).
+
+        Only runs when a ``[rt]`` section is present.  Invalid values are
+        logged at ``ERROR`` (the offending key is dropped); the service always
+        continues with normal scheduling (REQ-RT-006).
+        """
+        cfg, findings = realtime.load_rt(self.config)
+        if cfg is None:
+            return
+
+        for finding in findings:
+            if finding.is_error:
+                self.logger.error("%s", finding.format())
+            else:
+                self.logger.warning("%s", finding.format())
+
+        applied = realtime.apply_in_process(cfg, self.logger)
+        status = realtime.status_object(cfg, findings, applied)
+        realtime.log_mismatches(cfg, status, self.logger)
+
+        self._rt = cfg
+        self._rt_status = status
 
     # ------------------------------------------------------------------
     # built-in configuration validation
@@ -413,6 +457,33 @@ class ProcessBase:
     def dbus_health_get_requires(self) -> list[str]:
         """Return the union of ``requires`` tags across all contracts."""
         return self._collect_contract_tags("iface_requires")
+
+    def health_status_dict(self) -> dict[str, Any]:
+        """Base payload for ``HealthContract.status()``.
+
+        Includes the real-time ``rt`` object when a ``[rt]`` section is
+        configured (REQ-XCUT-004 / REQ-RT-009).  Services should serialize this
+        and may add their own fields.
+        """
+        status: dict[str, Any] = {
+            "name": self.name,
+            "version": self.version,
+            "uptime": self._health_uptime(),
+            "provides": self.dbus_health_get_provides(),
+            "requires": self.dbus_health_get_requires(),
+        }
+        if self._rt_status is not None:
+            status["rt"] = self._rt_status
+        return status
+
+    def _health_uptime(self) -> int:
+        """Delegate to the service's ``dbus_health_get_uptime`` callback.
+
+        Defined by the service (``HealthContract`` requirement); looked up
+        dynamically so the base class needs no stub.
+        """
+        fn = getattr(self, "dbus_health_get_uptime", None)
+        return int(fn()) if callable(fn) else 0
 
     async def init_loop(self) -> bool:
         """Initialize the asyncio event loop.
