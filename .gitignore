@@ -13,6 +13,9 @@ dist/
 # Sphinx documentation
 doc/_build/
 
+# Generated man page build (debian/rules)
+debian/man-build/
+
 # Test / coverage artifacts
 .pytest_cache/
 .coverage

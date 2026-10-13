@@ -12,65 +12,204 @@ from typing import Any
 from . import realtime
 
 
+def _version() -> str:
+    """Return the pympacds package version (best effort)."""
+    try:
+        from importlib.metadata import version
+
+        return version("pympacds")
+    except Exception:  # noqa: BLE001
+        pass
+    # Fallback for running from a source checkout (not installed).
+    pyproject = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "..", "pyproject.toml")
+    )
+    try:
+        with open(pyproject, encoding="utf-8") as f:
+            for line in f:
+                if line.startswith("version = "):
+                    return line.split("=", 1)[1].strip().strip('"')
+    except OSError:
+        pass
+    return "unknown"
+
+
+_EPILOG = """\
+commands:
+  setup            Install framework-wide files (system user, log dir, D-Bus policy)
+  install          Install a service: systemd unit, D-Bus policy, and [rt] drop-in
+  new              Scaffold a new service package
+  new-middleware   Scaffold a new middleware package
+  list             List running pympacds services on the D-Bus system bus
+  config           Inspect and edit INI configuration files
+
+examples:
+  # One-time system setup (system user, /var/log/pympacds, D-Bus policy)
+  sudo pympacds-admin setup --bus-prefix org.pympacds
+
+  # Register a service shipped by a package (uses its own unit and D-Bus policy)
+  sudo pympacds-admin install mqtt --start
+
+  # Register a CUSTOM program with a CUSTOM config file
+  sudo pympacds-admin install mysvc \\
+      --program /usr/local/bin/myapp \\
+      --config /etc/myapp/myapp.ini --start
+
+  # Inspect and edit a service configuration
+  pympacds-admin config show -c /etc/pympacds/mqtt.ini
+  sudo pympacds-admin config set -c /etc/pympacds/mqtt.ini mqtt qos 1
+
+Run 'pympacds-admin COMMAND --help' for command-specific options.
+"""
+
+
+# Default systemd unit used when generating a unit for a custom program
+# (fallback if the shipped pympacds@.service.in template is not installed).
+_DEFAULT_UNIT = """\
+[Unit]
+Description=pympacds service: {service}
+After=dbus.service
+Requires=dbus.service
+
+[Service]
+Type=simple
+User={user}
+ExecStart={program} -c {config}
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+"""
+
+
 def main() -> None:
     """Entry point for ``pympacds-admin``."""
     parser = argparse.ArgumentParser(
         prog="pympacds-admin",
-        description="pympacds administration tool",
+        description="pympacds administration tool — set up the framework, "
+        "install/register services, and manage their INI configuration.",
+        epilog=_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    sub = parser.add_subparsers(dest="command", required=True)
+    parser.add_argument("--version", action="version", version=f"%(prog)s {_version()}")
+    sub = parser.add_subparsers(dest="command", required=True, metavar="COMMAND")
 
     # setup
-    sp_setup = sub.add_parser("setup", help="Install framework-wide files")
+    sp_setup = sub.add_parser(
+        "setup",
+        help="Install framework-wide files",
+        description="Create the pympacds system user and log directory and install the "
+        "D-Bus security policy (requires root).",
+    )
     _add_setup_args(sp_setup)
 
     # install
-    sp_install = sub.add_parser("install", help="Install a service (systemd + D-Bus)")
-    sp_install.add_argument("service_name", help="Name of the service to install")
+    sp_install = sub.add_parser(
+        "install",
+        help="Install a service (systemd unit + D-Bus policy + [rt] drop-in)",
+        description="Install a service. By default the systemd unit and D-Bus policy "
+        "shipped by the service package are copied. With --program, a unit is "
+        "generated from the framework template so a CUSTOM executable and config "
+        "file can be registered (requires root).",
+    )
+    sp_install.add_argument("service_name", metavar="SERVICE", help="Service name")
     sp_install.add_argument(
-        "-c", "--config", default="", help="Service INI file (used for the [rt] section)"
+        "-c",
+        "--config",
+        default="",
+        metavar="FILE",
+        help="Service INI file: read for the [rt] section and used as the config path "
+        "in the generated unit (default /etc/pympacds/SERVICE.ini)",
+    )
+    sp_install.add_argument(
+        "--program",
+        default="",
+        metavar="PATH",
+        help="Executable to run; setting it generates the unit from the framework "
+        "template (default /usr/bin/pympacds-SERVICE)",
+    )
+    sp_install.add_argument(
+        "--user",
+        default="pympacds-user",
+        metavar="USER",
+        help="System user the generated unit runs as (default pympacds-user)",
     )
     sp_install.add_argument("--no-enable", action="store_true", help="Skip systemctl enable")
     sp_install.add_argument("--start", action="store_true", help="Start the service after install")
-    sp_install.add_argument("--dry-run", action="store_true", help="Print paths only")
+    sp_install.add_argument("--dry-run", action="store_true", help="Print actions; change nothing")
 
     # new
-    sp_new = sub.add_parser("new", help="Scaffold a new service")
-    sp_new.add_argument("service_name", help="Name of the service to create")
+    sp_new = sub.add_parser(
+        "new",
+        help="Scaffold a new service",
+        description="Create a new service package skeleton in ./NAME/.",
+    )
+    sp_new.add_argument("service_name", metavar="NAME", help="Name of the service to create")
 
     # new-middleware
-    sp_nmw = sub.add_parser("new-middleware", help="Scaffold a new middleware package")
-    sp_nmw.add_argument("name", help="Name of the middleware to create")
+    sp_nmw = sub.add_parser(
+        "new-middleware",
+        help="Scaffold a new middleware package",
+        description="Create a new middleware package skeleton in ./NAME/.",
+    )
+    sp_nmw.add_argument("name", metavar="NAME", help="Name of the middleware to create")
 
     # list
-    sub.add_parser("list", help="List running pympacds services on the bus")
+    sub.add_parser(
+        "list",
+        help="List running pympacds services on the bus",
+        description="List pympacds services currently registered on the D-Bus system bus.",
+    )
 
     # config
-    sp_cfg = sub.add_parser("config", help="Configuration management")
-    cfg_sub = sp_cfg.add_subparsers(dest="cfg_command")
+    sp_cfg = sub.add_parser(
+        "config",
+        help="Configuration management",
+        description="Inspect and edit an INI configuration file.",
+    )
+    cfg_sub = sp_cfg.add_subparsers(dest="cfg_command", metavar="SUBCOMMAND")
 
-    cfg_show = cfg_sub.add_parser("show", help="Display current configuration")
+    cfg_show = cfg_sub.add_parser(
+        "show",
+        help="Display current configuration",
+        description="Print all sections and keys of the config file.",
+    )
     _add_config_file_arg(cfg_show)
 
-    cfg_get = cfg_sub.add_parser("get", help="Get a config value")
-    cfg_get.add_argument("section", help="INI section")
-    cfg_get.add_argument("key", help="Config key")
+    cfg_get = cfg_sub.add_parser(
+        "get", help="Get a config value", description="Print a single key's value."
+    )
+    cfg_get.add_argument("section", metavar="SECTION", help="INI section")
+    cfg_get.add_argument("key", metavar="KEY", help="Config key")
     _add_config_file_arg(cfg_get)
 
-    cfg_set = cfg_sub.add_parser("set", help="Set a config value")
-    cfg_set.add_argument("section", help="INI section")
-    cfg_set.add_argument("key", help="Config key")
-    cfg_set.add_argument("value", help="Config value")
+    cfg_set = cfg_sub.add_parser(
+        "set",
+        help="Set a config value",
+        description="Set a key, creating the section if needed, and write the file.",
+    )
+    cfg_set.add_argument("section", metavar="SECTION", help="INI section")
+    cfg_set.add_argument("key", metavar="KEY", help="Config key")
+    cfg_set.add_argument("value", metavar="VALUE", help="Config value")
     _add_config_file_arg(cfg_set)
 
-    cfg_rm = cfg_sub.add_parser("remove", help="Remove a config key")
-    cfg_rm.add_argument("section", help="INI section")
-    cfg_rm.add_argument("key", help="Config key")
+    cfg_rm = cfg_sub.add_parser(
+        "remove",
+        help="Remove a config key",
+        description="Remove a key from the config file.",
+    )
+    cfg_rm.add_argument("section", metavar="SECTION", help="INI section")
+    cfg_rm.add_argument("key", metavar="KEY", help="Config key")
     _add_config_file_arg(cfg_rm)
 
-    cfg_val = cfg_sub.add_parser("validate", help="Validate config against schema")
+    cfg_val = cfg_sub.add_parser(
+        "validate",
+        help="Validate config against schema",
+        description="Validate built-in [DEFAULT]/[dbus]/[rt] keys and, optionally, a JSON schema.",
+    )
     _add_config_file_arg(cfg_val)
-    cfg_val.add_argument("-s", "--schema", help="Schema file path (JSON)")
+    cfg_val.add_argument("-s", "--schema", metavar="FILE", help="JSON schema file (optional)")
 
     args = parser.parse_args()
 
@@ -96,30 +235,60 @@ def main() -> None:
 
 
 def _add_setup_args(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--bus-prefix", default="org.pympacds", help="Bus name prefix")
-    parser.add_argument("--resource-dir", default="/usr/share/pympacds", help="Template directory")
-    parser.add_argument("--no-dirs", action="store_true")
-    parser.add_argument("--quiet", action="store_true")
-    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--bus-prefix",
+        default="org.pympacds",
+        metavar="PREFIX",
+        help="D-Bus bus-name prefix (default org.pympacds)",
+    )
+    parser.add_argument(
+        "--resource-dir",
+        default="/usr/share/pympacds",
+        metavar="DIR",
+        help="Directory holding the templates (pympacds.conf.in, pympacds@.service.in)",
+    )
+    parser.add_argument(
+        "--no-dirs",
+        action="store_true",
+        help="Do not create the system user or the log directory",
+    )
+    parser.add_argument("--quiet", action="store_true", help="Suppress the completion message")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Print actions without changing the system"
+    )
+
+
+def _ensure_system_user(dry_run: bool) -> None:
+    """Create the pympacds system user if missing (no-op in dry-run)."""
+    if dry_run:
+        print("Would create system user: pympacds-user")
+        return
+    if _run(["id", "pympacds-user"], check=False, quiet=True).returncode != 0:
+        _run(["adduser", "--system", "--no-create-home", "--group", "pympacds-user"])
+        _run(["adduser", "pympacds-user", "dbus"], check=False)
+
+
+def _ensure_log_dir(dry_run: bool) -> None:
+    """Create the log directory if missing (no-op in dry-run)."""
+    if dry_run:
+        print("Would create directory: /var/log/pympacds")
+        return
+    os.makedirs("/var/log/pympacds", exist_ok=True)
+    _run(["chown", "pympacds-user:pympacds-user", "/var/log/pympacds"])
 
 
 def _cmd_setup(args) -> None:
-    _ensure_root()
+    dry_run = getattr(args, "dry_run", False)
+    if not dry_run:
+        _ensure_root()
 
     resource_dir = args.resource_dir
     bus_prefix = args.bus_prefix
 
-    # 1. create system user
+    # 1-2. system user and log directory
     if not args.no_dirs:
-        _run(["id", "pympacds-user"], check=False, quiet=True)
-        if _run(["id", "pympacds-user"], check=False, quiet=True).returncode != 0:
-            _run(["adduser", "--system", "--no-create-home", "--group", "pympacds-user"])
-            _run(["adduser", "pympacds-user", "dbus"], check=False)
-
-    # 2. create /var/log/pympacds
-    if not args.no_dirs:
-        os.makedirs("/var/log/pympacds", exist_ok=True)
-        _run(["chown", "pympacds-user:pympacds-user", "/var/log/pympacds"])
+        _ensure_system_user(dry_run)
+        _ensure_log_dir(dry_run)
 
     # 3. install D-Bus security policy
     policy_src = os.path.join(resource_dir, "pympacds.conf.in")
@@ -183,42 +352,103 @@ def _update_file_prefix(path: str, new_prefix: str, dry_run: bool) -> None:
 # ------------------------------------------------------------------
 
 
+def _render_unit(service_name: str, program: str, user: str, config_path: str) -> str:
+    """Render a systemd unit for a service from the shipped template.
+
+    Falls back to a built-in unit when the template is not installed.
+    """
+    tpl = _find_resource("pympacds@.service.in")
+    if os.path.exists(tpl):
+        with open(tpl) as f:
+            content = f.read()
+        content = content.replace("@EXEC_START@", program)
+        content = content.replace("@USER@", user)
+        content = content.replace("%i", service_name)
+        content = content.replace(f"/etc/pympacds/{service_name}.ini", config_path)
+        return content
+    return _DEFAULT_UNIT.format(
+        service=service_name, user=user, program=program, config=config_path
+    )
+
+
+def _copy_policy(conf_src: str, conf_dst: str, dry_run: bool) -> None:
+    """Install the service D-Bus policy if the package ships one."""
+    if not os.path.exists(conf_src):
+        return
+    if dry_run:
+        print(f"DBus policy:   {conf_src} -> {conf_dst}")
+        return
+    shutil.copy(conf_src, conf_dst)
+    print(f"Installed: {conf_dst}")
+    _run(["pkill", "-HUP", "dbus-daemon"], check=False)
+
+
+def _install_generated_unit(
+    unit_dst: str, unit_body: str, conf_src: str, conf_dst: str, dry_run: bool
+) -> None:
+    """Write a unit generated from the template for a custom program."""
+    if dry_run:
+        print(f"Generate unit: {unit_dst}")
+        print(unit_body)
+        _copy_policy(conf_src, conf_dst, dry_run=True)
+        return
+    os.makedirs(os.path.dirname(unit_dst), exist_ok=True)
+    with open(unit_dst, "w") as f:
+        f.write(unit_body)
+    print(f"Installed: {unit_dst}")
+    _copy_policy(conf_src, conf_dst, dry_run=False)
+
+
+def _install_packaged_unit(
+    unit_src: str, unit_dst: str, conf_src: str, conf_dst: str, dry_run: bool
+) -> None:
+    """Copy the systemd unit shipped by a service package."""
+    if dry_run:
+        print(f"Service unit: {unit_src}")
+        print(f"DBus policy:  {conf_src}")
+        return
+    shutil.copy(unit_src, unit_dst)
+    print(f"Installed: {unit_dst}")
+    _copy_policy(conf_src, conf_dst, dry_run=False)
+
+
+def _apply_systemd(service_name: str, no_enable: bool, start: bool) -> None:
+    """Reload systemd and optionally enable/start the service unit."""
+    _run(["systemctl", "daemon-reload"])
+    if not no_enable:
+        _run(["systemctl", "enable", f"pympacds-{service_name}"])
+    if start:
+        _run(["systemctl", "start", f"pympacds-{service_name}"])
+
+
 def _cmd_install(args) -> None:
     if not args.dry_run:
         _ensure_root()
 
     service_name = args.service_name
-
-    # locate files — service packages ship .service and .conf in their
-    # installed package data
-    unit_src = _find_resource(f"pympacds-{service_name}.service")
-    conf_src = _find_resource(f"{service_name}.conf")
-
-    if args.dry_run:
-        print(f"Service unit: {unit_src}")
-        print(f"DBus policy:  {conf_src}")
+    dry_run = args.dry_run
+    program = getattr(args, "program", "")
+    config_path = getattr(args, "config", "") or f"/etc/pympacds/{service_name}.ini"
+    user = getattr(args, "user", "pympacds-user")
 
     unit_dst = f"/etc/systemd/system/pympacds-{service_name}.service"
     conf_dst = f"/etc/dbus-1/system.d/{service_name}.conf"
+    conf_src = _find_resource(f"{service_name}.conf")
 
-    if not args.dry_run:
-        shutil.copy(unit_src, unit_dst)
-        print(f"Installed: {unit_dst}")
-
-        if os.path.exists(conf_src):
-            shutil.copy(conf_src, conf_dst)
-            print(f"Installed: {conf_dst}")
-            _run(["pkill", "-HUP", "dbus-daemon"], check=False)
+    if program:
+        unit_body = _render_unit(service_name, program, user, config_path)
+        _install_generated_unit(unit_dst, unit_body, conf_src, conf_dst, dry_run)
+    else:
+        unit_src = _find_resource(f"pympacds-{service_name}.service")
+        _install_packaged_unit(unit_src, unit_dst, conf_src, conf_dst, dry_run)
 
     # real-time drop-in (REQ-RT-004); strict, fail-closed
-    rt_failed = _install_realtime(service_name, args, dry_run=args.dry_run)
+    rt_failed = _install_realtime(service_name, args, dry_run=dry_run)
 
-    if not args.dry_run:
-        _run(["systemctl", "daemon-reload"])
-        if not args.no_enable:
-            _run(["systemctl", "enable", f"pympacds-{service_name}"])
-        if args.start:
-            _run(["systemctl", "start", f"pympacds-{service_name}"])
+    if not dry_run:
+        no_enable = getattr(args, "no_enable", False)
+        start = getattr(args, "start", False)
+        _apply_systemd(service_name, no_enable, start)
 
     if rt_failed:
         sys.exit(1)
@@ -677,6 +907,9 @@ def _cmd_list(args) -> None:
             file=sys.stderr,
         )
         sys.exit(1)
+    except Exception as exc:  # noqa: BLE001
+        # No system bus reachable (e.g. in a container): not fatal for a listing.
+        print(f"Unable to list services: {exc}", file=sys.stderr)
 
 
 # ------------------------------------------------------------------
@@ -883,3 +1116,7 @@ def _run(cmd: list, check: bool = True, quiet: bool = False) -> subprocess.Compl
         if check:
             sys.exit(1)
         return subprocess.CompletedProcess(cmd, 1)
+
+
+if __name__ == "__main__":
+    main()

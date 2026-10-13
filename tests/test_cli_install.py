@@ -103,3 +103,56 @@ class TestCmdInstall:
         cmd_strs = [" ".join(c) for c in calls]
         assert not any("enable" in s for s in cmd_strs)
         assert not any("start" in s for s in cmd_strs)
+
+    def test_install_dry_run_custom_program(self, tmp_path, monkeypatch, capsys):
+        """install --program generates a unit for a custom program/config."""
+        from pympacds.cli import _cmd_install
+
+        tpl = tmp_path / "pympacds@.service.in"
+        tpl.write_text("User=@USER@\nExecStart=@EXEC_START@ -c /etc/pympacds/%i.ini\n")
+        monkeypatch.setattr(
+            "pympacds.cli._find_resource",
+            staticmethod(lambda fn: str(tpl)),
+        )
+
+        class Args:
+            service_name = "mysvc"
+            dry_run = True
+            program = "/usr/local/bin/myapp"
+            user = "svcuser"
+            config = "/etc/myapp/myapp.ini"
+
+        _cmd_install(Args)
+        out = capsys.readouterr().out
+        assert "User=svcuser" in out
+        assert "ExecStart=/usr/local/bin/myapp -c /etc/myapp/myapp.ini" in out
+
+
+class TestRenderUnit:
+    def test_from_template(self, tmp_path, monkeypatch):
+        """_render_unit substitutes @EXEC_START@/@USER@/%i and the config path."""
+        from pympacds.cli import _render_unit
+
+        tpl = tmp_path / "pympacds@.service.in"
+        tpl.write_text("User=@USER@\nExecStart=@EXEC_START@ -c /etc/pympacds/%i.ini\n")
+        monkeypatch.setattr(
+            "pympacds.cli._find_resource",
+            staticmethod(lambda fn: str(tpl)),
+        )
+
+        body = _render_unit("mysvc", "/usr/local/bin/myapp", "svcuser", "/etc/myapp/myapp.ini")
+        assert "User=svcuser" in body
+        assert "ExecStart=/usr/local/bin/myapp -c /etc/myapp/myapp.ini" in body
+
+    def test_fallback_without_template(self, monkeypatch):
+        """Without the shipped template, a built-in unit is used."""
+        from pympacds.cli import _render_unit
+
+        monkeypatch.setattr(
+            "pympacds.cli._find_resource",
+            staticmethod(lambda fn: "/nonexistent"),
+        )
+
+        body = _render_unit("mysvc", "/usr/local/bin/myapp", "svcuser", "/etc/myapp/myapp.ini")
+        assert "User=svcuser" in body
+        assert "ExecStart=/usr/local/bin/myapp -c /etc/myapp/myapp.ini" in body

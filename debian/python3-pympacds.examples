@@ -1,0 +1,4 @@
+examples/collector.ini
+examples/collector.py
+examples/sensor.ini
+examples/sensor.py

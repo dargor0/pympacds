@@ -28,6 +28,12 @@ def test_cli_help():
     assert r.returncode == 0, r.stderr
 
 
+def test_cli_version():
+    r = _run_cli("--version")
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.startswith("pympacds-admin "), r.stdout
+
+
 def test_cli_config_show_help():
     r = _run_cli("config", "show", "--help")
     assert r.returncode == 0

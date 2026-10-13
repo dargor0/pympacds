@@ -1,3 +1,13 @@
+pympacds (0.3.1-1) UNRELEASED; urgency=medium
+
+  * pympacds-admin: complete argparse help.
+  * pympacds-admin install: support for custom programs and config files.
+  * Ship a generated pympacds-admin(1) man page, built at package time from
+    doc/cli.md with Sphinx.
+  * Install the README and the example services under /usr/share/doc/.
+
+ -- Oscar Diaz <odiaz@ieee.org>  Tue, 13 Oct 2026 11:49:02 -0500
+
 pympacds (0.3.0-1) UNRELEASED; urgency=medium
 
   * Add real-time configuration support: parsing and validation,

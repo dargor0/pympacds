@@ -14,6 +14,8 @@ contracts
 middleware
 signal_action
 real-time
+tags
+cli
 api
 ```
 
