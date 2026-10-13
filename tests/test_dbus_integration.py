@@ -8,9 +8,9 @@ import pytest
 pytestmark = pytest.mark.asyncio
 
 
-async def test_bus_name_assignment(session_bus):
+async def test_bus_name_assignment(session_bus, bus_prefix):
     """Bus name is assigned correctly and uses the prefix."""
-    assert session_bus.busname.startswith("org.pympacds.test")
+    assert session_bus.busname.startswith(f"{bus_prefix}.test")
     assert session_bus.bus.unique_name is not None
     assert session_bus.bus.unique_name.startswith(":")
 
@@ -48,7 +48,7 @@ async def test_get_interface_introspects_dbus(session_bus):
     assert "org.freedesktop.DBus" in names
 
 
-async def test_get_friend_bus(session_bus, session_bus_address):
+async def test_get_friend_bus(session_bus, session_bus_address, bus_prefix):
     """get_friend_bus returns a proxy for a discovered friend."""
     from pympacds.contracts import ServiceContract, dbus_method
     from pympacds.dbus import DBusManager
@@ -75,11 +75,11 @@ async def test_get_friend_bus(session_bus, session_bus_address):
     friend = DBusManager(
         logger=friend_logger,
         busname="friend.svc",
-        bus_prefix="org.pympacds.test",
+        bus_prefix=f"{bus_prefix}.test",
         discovery_enabled=False,
         name_flags=0,
     )
-    iface = FriendContract("org.pympacds.test.FriendTest", FriendBase())
+    iface = FriendContract(f"{bus_prefix}.test.FriendTest", FriendBase())
     friend.add_interface("friend", iface)
     await friend.start()
     try:
@@ -90,7 +90,7 @@ async def test_get_friend_bus(session_bus, session_bus_address):
         # get a proxy to the friend's interface
         proxy = await session_bus.get_friend_bus(
             friend.busname,
-            ifname="org.pympacds.test.FriendTest",
+            ifname=f"{bus_prefix}.test.FriendTest",
             objpath=friend._obj_root + "/friend",
         )
         assert proxy is not None

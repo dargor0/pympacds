@@ -2,6 +2,7 @@
 
 import configparser
 import os
+import shlex
 import signal
 import subprocess
 import tempfile
@@ -10,12 +11,70 @@ import time
 import pytest
 
 # ------------------------------------------------------------------
+# Implementation-agnostic black-box harness (REQ-XCUT-002.1).
+#
+# Wire-contract tests launch a service as an external process and talk to it
+# only over D-Bus, so the same tests drive the Python reference implementation
+# or the C++ port unchanged.  Two environment variables parameterize them:
+#   MPACDS_BUS_PREFIX   bus-name prefix (default "org.pympacds")
+#   MPACDS_CMD_<NAME>   launch command for service <NAME> (else the default)
+# ------------------------------------------------------------------
+
+BUS_PREFIX = os.environ.get("MPACDS_BUS_PREFIX", "org.pympacds")
+
+
+def service_command(name, default_argv):
+    """Return the argv used to launch service ``name``.
+
+    Overridable with ``MPACDS_CMD_<NAME>`` (e.g.
+    ``MPACDS_CMD_MQTT=/usr/bin/cppmpacds-mqtt``) so the C++ implementation can
+    be driven by the same tests.
+    """
+    override = os.environ.get(f"MPACDS_CMD_{name.upper()}")
+    if override:
+        return shlex.split(override)
+    return list(default_argv)
+
+
+@pytest.fixture(scope="session")
+def bus_prefix():
+    """Bus-name prefix shared by the service under test and the D-Bus client."""
+    return BUS_PREFIX
+
+
+@pytest.fixture(scope="session")
+def launch_service():
+    """Return ``launch(name, ini, address, default_argv, extra_env=None)``.
+
+    Starts the service under test as a subprocess connected to the isolated
+    test bus.  ``name`` selects the ``MPACDS_CMD_<NAME>`` override; otherwise
+    ``default_argv`` is used.  ``-c <ini>`` is appended to the command.
+    """
+
+    def _launch(name, ini, address, default_argv, extra_env=None):
+        env = os.environ.copy()
+        env["DBUS_SYSTEM_BUS_ADDRESS"] = address
+        if extra_env:
+            env.update(extra_env)
+        argv = service_command(name, default_argv) + ["-c", str(ini)]
+        return subprocess.Popen(
+            argv,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=env,
+        )
+
+    return _launch
+
+
+# ------------------------------------------------------------------
 # INI config fixtures
 # ------------------------------------------------------------------
 
 
 @pytest.fixture
-def ini_file():
+def ini_file(bus_prefix):
     """Create a temporary INI config file with defaults."""
     cp = configparser.ConfigParser()
     cp["DEFAULT"] = {
@@ -25,7 +84,7 @@ def ini_file():
     }
     cp["dbus"] = {
         "bus_type": "system",
-        "bus_prefix": "org.pympacds.test",
+        "bus_prefix": f"{bus_prefix}.test",
         "contract_health": "true",
         "contract_metrics": "false",
         "contract_lifecycle": "false",
@@ -183,7 +242,7 @@ def session_bus_address():
 
 
 @pytest.fixture
-async def session_bus(session_bus_address):
+async def session_bus(session_bus_address, bus_prefix):
     """Create a connected DBusManager on the isolated session bus."""
     import logging
 
@@ -198,7 +257,7 @@ async def session_bus(session_bus_address):
     mgr = DBusManager(
         logger=logger,
         busname="test.fixture",
-        bus_prefix="org.pympacds",
+        bus_prefix=bus_prefix,
         discovery_enabled=False,
         name_flags=0,  # NameFlag.NONE — test bus has no existing name to replace
     )

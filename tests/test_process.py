@@ -52,12 +52,12 @@ class TestProcessBaseSetup:
         result = p.setup(["-c", ini_file])
         assert result is True
 
-    def test_setup_applies_dbus_config(self, ini_file):
+    def test_setup_applies_dbus_config(self, ini_file, bus_prefix):
         from pympacds.process import ProcessBase
 
         p = ProcessBase("test", "0.1")
         p.setup(["-c", ini_file])
-        assert p.bus_prefix == "org.pympacds.test"
+        assert p.bus_prefix == f"{bus_prefix}.test"
 
     def test_setup_creates_logger(self, ini_file):
         from pympacds.process import ProcessBase

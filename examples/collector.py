@@ -12,7 +12,7 @@ from pympacds.process import ProcessBase
 
 _PropertyAccess = get_dbus_lib().PropertyAccess
 
-_SENSOR_IFACE = "org.pympacds.example.Sensor"
+_SENSOR_IFACE_SUFFIX = "example.Sensor"
 _SENSOR_REL_PATH = "sensor"
 
 
@@ -44,7 +44,7 @@ class CollectorService(ProcessBase):
             busname="collector",
             bus_prefix=self.bus_prefix,
         )
-        self.iface = CollectorContract("org.pympacds.example.Collector", self)
+        self.iface = CollectorContract(f"{self.bus_prefix}.example.Collector", self)
         self.bus.add_interface("collector", self.iface)
         await self.bus.start()
         self.logger.info("Collector started: bus=%s", self.bus.busname)
@@ -75,7 +75,7 @@ class CollectorService(ProcessBase):
                         try:
                             proxy = await self.bus.get_friend_bus(
                                 busname,
-                                ifname=_SENSOR_IFACE,
+                                ifname=f"{self.bus_prefix}.{_SENSOR_IFACE_SUFFIX}",
                                 objpath=f"{self.bus._obj_root}/{_SENSOR_REL_PATH}",
                             )
                             proxy.on_measurement(self._on_measurement)

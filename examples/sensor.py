@@ -52,7 +52,7 @@ class SensorService(ProcessBase):
             busname="sensor",
             bus_prefix=self.bus_prefix,
         )
-        self.iface = SensorContract("org.pympacds.example.Sensor", self)
+        self.iface = SensorContract(f"{self.bus_prefix}.example.Sensor", self)
         self.bus.add_interface("sensor", self.iface)
         await self.bus.start()
         self.logger.info("Sensor started: bus=%s id=%s", self.bus.busname, self._sensor_id)
