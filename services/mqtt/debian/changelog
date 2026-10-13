@@ -1,6 +1,7 @@
-pympacds-http (0.1.2-1) UNRELEASED; urgency=medium
+pympacds-http (0.1.3-1) UNRELEASED; urgency=medium
 
   * Ship the README in /usr/share/doc and document pip/PPA installation.
+  * Testing parametrization for bus_prefix, and various improvements.
 
  -- Oscar Diaz <odiaz@ieee.org>  Tue, 13 Oct 2026 12:07:19 -0500
 
