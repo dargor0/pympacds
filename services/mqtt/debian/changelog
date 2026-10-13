@@ -1,4 +1,4 @@
-pympacds-http (0.1.3-1) UNRELEASED; urgency=medium
+pympacds-mqtt (0.1.3-1) UNRELEASED; urgency=medium
 
   * Ship the README in /usr/share/doc and document pip/PPA installation.
   * Testing parametrization for bus_prefix, and various improvements.
