@@ -13,27 +13,27 @@ The framework is designed for any domain — IoT gateways, industrial control, h
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    D-Bus System Bus                          │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
-│  │ Service A │  │ Service B │  │ Service C │  │ Service D │   │
-│  │ (sensor)  │  │ (storage) │  │ (comm)    │  │ (ui)      │   │
-│  │ ProcessBase│ │ ProcessBase│ │ ProcessBase│ │ ProcessBase│  │
-│  │ DBusManager│ │ DBusManager│ │ DBusManager│ │ DBusManager│  │
-│  │ task1      │ │ task1      │ │ task1      │ │ task1      │  │
-│  │ task2      │ │ task2      │ │            │ │            │  │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
-│       │              │              │              │         │
-│  discover ←────────→ discover ←────→ discover ←──→ discover │
-│  (auto peer detection via NameOwnerChanged)                 │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                    D-Bus System Bus                             │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐ │
+│  │ Service A  │  │ Service B  │  │ Service C  │  │ Service D  │ │
+│  │ (sensor)   │  │ (storage)  │  │ (comm)     │  │ (ui)       │ │
+│  │ ProcessBase│  │ ProcessBase│  │ ProcessBase│  │ ProcessBase│ │
+│  │ DBusManager│  │ DBusManager│  │ DBusManager│  │ DBusManager│ │
+│  │ task1      │  │ task1      │  │ task1      │  │ task1      │ │
+│  │ task2      │  │ task2      │  │            │  │            │ │
+│  └────────────┘  └────────────┘  └────────────┘  └────────────┘ │
+│       │                 │              │               │        │
+│  discover ←────────→ discover ←────→ discover ←───→ discover    │
+│  (auto peer detection via NameOwnerChanged)                     │
+└─────────────────────────────────────────────────────────────────┘
                               │
-                    ┌─────────┴──────────┐
+                    ┌─────────┴───────────┐
                     │    systemd (PID 1)  │
                     │  service-a.service  │
                     │  service-b.service  │
                     │  service-c.service  │
-                    └────────────────────┘
+                    └─────────────────────┘
 ```
 
 ## Features
@@ -113,6 +113,8 @@ MyService().start()
 
 ## Installation
 
+### Using PIP
+
 ```bash
 pip install pympacds
 ```
@@ -122,6 +124,22 @@ For minimal embedded deployments without the optional Cython extension:
 ```bash
 SKIP_CYTHON=1 pip install --no-binary dbus-fast pympacds
 ```
+
+Note: using pip doesn't install the system configurations files (it requires admin privileges to save D-Bus configurations). In order to work run `sudo pympacds-admin setup` before running services.
+
+### Using PPA
+
+Debian packages are provided through launchpad ppa ([dargor0/mpacds](https://launchpad.net/~dargor0/+archive/ubuntu/mpacds)):
+
+```bash
+sudo add-apt-repository ppa:dargor0/mpacds
+sudo apt update
+sudo apt install python3-pympacds
+```
+
+Packages are installed system wide with all configurations and resource files (no need to do a `setup` step).
+
+Repository has been tested on Ubuntu (plucky, resolute, stonking) and Debian (stable, testing, unstable).
 
 ## Documentation
 
