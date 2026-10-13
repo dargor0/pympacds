@@ -1,6 +1,7 @@
 """Shared fixtures for pympacds-gpio tests (REQ-GPIO-009)."""
 
 import os
+import shlex
 import signal
 import subprocess
 import tempfile
@@ -8,6 +9,56 @@ import time
 
 import pytest
 from helpers import FakeShim
+
+# ------------------------------------------------------------------
+# Implementation-agnostic black-box harness (REQ-XCUT-002.1).
+#   MPACDS_BUS_PREFIX   bus-name prefix (default "org.pympacds")
+#   MPACDS_CMD_<NAME>   launch command (else the Python module launcher)
+# ------------------------------------------------------------------
+
+BUS_PREFIX = os.environ.get("MPACDS_BUS_PREFIX", "org.pympacds")
+
+# Make the service and core importable by subprocesses even when they are not
+# pip-installed, mirroring the pytest "pythonpath" setting (service src + core src).
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_SOURCE_PATHS = os.pathsep.join(
+    [
+        os.path.join(_HERE, "..", "src"),
+        os.path.join(_HERE, "..", "..", "..", "src"),
+    ]
+)
+
+
+def service_command(name, default_argv):
+    override = os.environ.get(f"MPACDS_CMD_{name.upper()}")
+    if override:
+        return shlex.split(override)
+    return list(default_argv)
+
+
+@pytest.fixture(scope="session")
+def bus_prefix():
+    return BUS_PREFIX
+
+
+@pytest.fixture(scope="session")
+def launch_service():
+    def _launch(name, ini, address, default_argv, extra_env=None):
+        env = os.environ.copy()
+        env["DBUS_SYSTEM_BUS_ADDRESS"] = address
+        existing = env.get("PYTHONPATH")
+        if existing:
+            env["PYTHONPATH"] = f"{_SOURCE_PATHS}{os.pathsep}{existing}"
+        else:
+            env["PYTHONPATH"] = _SOURCE_PATHS
+        if extra_env:
+            env.update(extra_env)
+        argv = service_command(name, default_argv) + ["-c", str(ini)]
+        return subprocess.Popen(
+            argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env
+        )
+
+    return _launch
 
 
 @pytest.fixture

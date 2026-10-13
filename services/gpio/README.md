@@ -32,9 +32,46 @@ zero-dependency property.
 
 ## Installation
 
+### Using PIP
+
 ```bash
 pip install pympacds-gpio
 ```
+
+Using pip installs the Python package only — the D-Bus policy, systemd unit,
+and udev rule are **not** installed. You can still run the service directly
+with `pympacds-gpio -c /etc/pympacds/gpio.ini`, or register and enable it
+system-wide with the admin script. Since there is no packaged unit, pass the
+pip-installed executable via `--program` so the unit is generated:
+
+```bash
+sudo pympacds-admin setup                      # one-time: user, log dir, D-Bus policy
+sudo pympacds-admin install gpio \
+    --program "$(command -v pympacds-gpio)" \
+    --config /etc/pympacds/gpio.ini --start
+```
+
+Under pip you must also grant access to `/dev/gpiochip*` yourself (see *Device
+access* below); the udev rule ships only with the Debian package.
+
+Alternatively, install the Debian package (see below), which already ships the
+unit, policy, and udev rule.
+
+### Using PPA
+
+Debian packages are provided through launchpad ppa ([dargor0/mpacds](https://launchpad.net/~dargor0/+archive/ubuntu/mpacds)):
+
+```bash
+sudo add-apt-repository ppa:dargor0/mpacds
+sudo apt update
+sudo apt install python3-pympacds-gpio
+```
+
+The package installs the service system-wide (executable, systemd unit, D-Bus
+policy, udev rule, and the `gpio.ini.example` config) and depends on
+`python3-pympacds`.
+
+Repository has been tested on Ubuntu (plucky, resolute, stonking) and Debian (stable, testing, unstable).
 
 ## Configuration
 
