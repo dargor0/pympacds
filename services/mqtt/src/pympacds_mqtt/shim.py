@@ -235,7 +235,6 @@ class MqttShim:
 
     async def connect(self) -> bool:
         """Connect (non-blocking).  Returns True on success."""
-        self._ensure_client()
         self._graceful = False
         self._shutdown = False
 
@@ -248,6 +247,7 @@ class MqttShim:
         keepalive = self._cfg_int("keepalive", 60)
 
         try:
+            self._ensure_client()
             infos = await loop.getaddrinfo(host, port, type=socket.SOCK_STREAM)
             if not infos:
                 raise OSError("no address resolved")

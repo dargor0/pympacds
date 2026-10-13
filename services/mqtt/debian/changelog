@@ -1,3 +1,9 @@
+pympacds-http (0.1.2-1) UNRELEASED; urgency=medium
+
+  * Ship the README in /usr/share/doc and document pip/PPA installation.
+
+ -- Oscar Diaz <odiaz@ieee.org>  Tue, 13 Oct 2026 12:07:19 -0500
+
 pympacds-mqtt (0.1.2-1) UNRELEASED; urgency=medium
 
   * Depend on python3-pympacds >= 0.3.0 (uses health_status_dict()).

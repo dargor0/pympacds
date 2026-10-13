@@ -58,9 +58,42 @@ single-asyncio-loop model:
 
 ## Installation
 
+### Using PIP
+
 ```bash
 pip install pympacds-mqtt
 ```
+
+Using pip installs the Python package only — the D-Bus policy and systemd unit
+are **not** installed. You can still run the service directly with
+`pympacds-mqtt -c /etc/pympacds/mqtt.ini`, or register and enable it
+system-wide with the admin script. Since there is no packaged unit, pass the
+pip-installed executable via `--program` so the unit is generated:
+
+```bash
+sudo pympacds-admin setup                      # one-time: user, log dir, D-Bus policy
+sudo pympacds-admin install mqtt \
+    --program "$(command -v pympacds-mqtt)" \
+    --config /etc/pympacds/mqtt.ini --start
+```
+
+Alternatively, install the Debian package (see below), which already ships the
+unit and policy.
+
+### Using PPA
+
+Debian packages are provided through launchpad ppa ([dargor0/mpacds](https://launchpad.net/~dargor0/+archive/ubuntu/mpacds)):
+
+```bash
+sudo add-apt-repository ppa:dargor0/mpacds
+sudo apt update
+sudo apt install python3-pympacds-mqtt
+```
+
+The package installs the service system-wide (executable, systemd unit, D-Bus
+policy, and the `mqtt.ini.example` config) and depends on `python3-pympacds`.
+
+Repository has been tested on Ubuntu (plucky, resolute, stonking) and Debian (stable, testing, unstable).
 
 ## Configuration
 
