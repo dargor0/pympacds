@@ -60,9 +60,10 @@ addopts = [
     "--cov-report=term-missing",
 ]
 filterwarnings = [
-    # Third-party deprecation from PyGObject (triggered by the D-Bus library's
-    # GLib backend import); pympacds uses asyncio and does not use GLib.
-    "ignore:GLib.unix_signal_add_full is deprecated.*:gi.PyGIDeprecationWarning",
+    # Third-party deprecation from PyGObject (only present when `gi` is
+    # installed). Matched by message only, so pytest does not try to import the
+    # `gi` module (which would emit a PytestConfigWarning when it is absent).
+    "ignore:GLib.unix_signal_add_full is deprecated.*",
 ]
 
 [tool.coverage.run]
