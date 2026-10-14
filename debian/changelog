@@ -1,3 +1,12 @@
+pympacds (0.3.2-1) UNRELEASED; urgency=medium
+
+  * Add project metadata, missing LICENSE file, added
+    CONTRIBUTING, CODE_OF_CONDUCT and issue/PR templates.
+  * Mark the PyPI Development Status as Beta.
+  * Add GitHub Actions CI and release workflow,
+
+ -- Oscar Diaz <odiaz@ieee.org>  Wed, 14 Oct 2026 12:36:19 -0500
+
 pympacds (0.3.1-1) UNRELEASED; urgency=medium
 
   * pympacds-admin: complete argparse help.

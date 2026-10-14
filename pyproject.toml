@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pympacds"
-version = "0.3.1"
+version = "0.3.2"
 description = "Python Multi Process Asyncio-based Cooperative Discoverable Services Framework"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -14,7 +14,7 @@ authors = [
 ]
 keywords = ["dbus", "asyncio", "daemon", "framework", "embedded", "ipc"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
@@ -25,6 +25,13 @@ classifiers = [
     "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Libraries :: Application Frameworks",
 ]
+
+[project.urls]
+Homepage = "https://github.com/dargor0/pympacds"
+Repository = "https://github.com/dargor0/pympacds"
+Issues = "https://github.com/dargor0/pympacds/issues"
+Changelog = "https://github.com/dargor0/pympacds/releases"
+Documentation = "https://github.com/dargor0/pympacds/tree/main/doc"
 
 [project.scripts]
 pympacds-admin = "pympacds.cli:main"

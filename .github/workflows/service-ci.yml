@@ -1,0 +1,49 @@
+name: Service CI
+
+on:
+  workflow_call:
+    inputs:
+      service:
+        required: true
+        type: string
+      apt_packages:
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: ${{ inputs.service }}
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dbus ${{ inputs.apt_packages }}
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pip install -e "services/${{ inputs.service }}"
+      - name: Format
+        working-directory: services/${{ inputs.service }}
+        run: ruff format --check .
+      - name: Lint
+        working-directory: services/${{ inputs.service }}
+        run: ruff check .
+      - name: Type check
+        working-directory: services/${{ inputs.service }}
+        run: mypy src/pympacds_${{ inputs.service }}
+      - name: Tests
+        working-directory: services/${{ inputs.service }}
+        run: pytest
+      - name: Complexity
+        working-directory: services/${{ inputs.service }}
+        run: lizard src -C 10 -w

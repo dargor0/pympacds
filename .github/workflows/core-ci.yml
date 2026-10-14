@@ -1,0 +1,39 @@
+name: Core CI
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: core (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install D-Bus (integration tests)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dbus
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: Format
+        run: ruff format --check .
+      - name: Lint
+        run: ruff check .
+      - name: Type check
+        run: mypy src/pympacds
+      - name: Tests
+        run: pytest
+      - name: Complexity
+        run: lizard src -C 10 -w

@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  # Compute which areas changed so unrelated jobs can be skipped: a change
+  # under services/<name>/ only runs that service; a core code change
+  # (src/**, pyproject.toml) also runs the services, since they depend on core.
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      changes: ${{ steps.filter.outputs.changes }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            core:
+              - '**'
+              - '!services/**'
+            corecode:
+              - 'src/**'
+              - 'pyproject.toml'
+            mqtt:
+              - 'services/mqtt/**'
+            http:
+              - 'services/http/**'
+            gpio:
+              - 'services/gpio/**'
+
+  core:
+    name: core
+    needs: changes
+    if: contains(fromJSON(needs.changes.outputs.changes), 'core')
+    uses: ./.github/workflows/core-ci.yml
+
+  mqtt:
+    name: mqtt
+    needs: changes
+    if: >-
+      contains(fromJSON(needs.changes.outputs.changes), 'mqtt') ||
+      contains(fromJSON(needs.changes.outputs.changes), 'corecode')
+    uses: ./.github/workflows/service-ci.yml
+    with:
+      service: mqtt
+
+  http:
+    name: http
+    needs: changes
+    if: >-
+      contains(fromJSON(needs.changes.outputs.changes), 'http') ||
+      contains(fromJSON(needs.changes.outputs.changes), 'corecode')
+    uses: ./.github/workflows/service-ci.yml
+    with:
+      service: http
+
+  # gpio requires libgpiod v2 (>= 2.0); both reusable workflows pin the 26.04
+  # runner, where libgpiod-dev provides v2.
+  gpio:
+    name: gpio
+    needs: changes
+    if: >-
+      contains(fromJSON(needs.changes.outputs.changes), 'gpio') ||
+      contains(fromJSON(needs.changes.outputs.changes), 'corecode')
+    uses: ./.github/workflows/service-ci.yml
+    with:
+      service: gpio
+      apt_packages: libgpiod-dev

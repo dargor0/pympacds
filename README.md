@@ -1,5 +1,11 @@
 # pympacds
 
+[![PyPI version](https://img.shields.io/pypi/v/pympacds.svg)](https://pypi.org/project/pympacds/)
+[![PyPI downloads](https://img.shields.io/pypi/dm/pympacds.svg)](https://pypistats.org/packages/pympacds)
+[![Python versions](https://img.shields.io/pypi/pyversions/pympacds.svg)](https://pypi.org/project/pympacds/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CI](https://github.com/dargor0/pympacds/actions/workflows/ci.yml/badge.svg)](https://github.com/dargor0/pympacds/actions/workflows/ci.yml)
+
 **Py**thon **M**ulti **P**rocess **A**sync-based **C**ooperative **D**iscoverable **S**ervices Framework
 
 A lightweight, D-Bus-native application framework for building modular, multi-process, asyncio-based daemons on Linux — particularly suited for embedded and IoT systems.
@@ -165,6 +171,11 @@ Detailed documentation lives in the [`doc/`](doc/) directory:
 ## Related Work
 
 - [dbus-fast](https://github.com/Bluetooth-Devices/dbus-fast) — underlying D-Bus library
+
+## Changelog
+
+Release notes are published on the
+[releases](https://github.com/dargor0/pympacds/releases) page.
 
 ## License
 
