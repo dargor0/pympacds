@@ -19,8 +19,8 @@ jobs:
     name: ${{ inputs.service }}
     runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - name: Install system dependencies
@@ -30,7 +30,7 @@ jobs:
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev,dbus-fast]"
+          pip install -e ".[dev,dbus-fast,dbus-next]"
           pip install -e "services/${{ inputs.service }}"
       - name: Format
         working-directory: services/${{ inputs.service }}

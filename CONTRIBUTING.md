@@ -10,7 +10,7 @@ Requires Python ≥ 3.10 and (for the integration tests) a `dbus-daemon` on `PAT
 git clone https://github.com/dargor0/pympacds
 cd pympacds
 python -m venv .venv && . .venv/bin/activate
-pip install -e ".[dev,dbus-fast]"
+pip install -e ".[dev,dbus-fast,dbus-next]"
 ```
 
 ## Running the checks

@@ -90,6 +90,7 @@ def test_get_dbus_service(monkeypatch):
 
 def test_all_modules_match(monkeypatch):
     """All getter functions return dbus-fast modules when dbus-fast is installed."""
+    pytest.importorskip("dbus_fast")
     with PrepareModule(monkeypatch, False):
         from pympacds import (
             get_dbus_aio,
@@ -117,6 +118,7 @@ def test_import_error_message(monkeypatch):
 
 def test_import_force_dbus_next(monkeypatch):
     """PYMPACDS_DBUS_BACKEND=dbus-next forces the dbus-next backend."""
+    pytest.importorskip("dbus_next")
     with PrepareModule(monkeypatch, False, "dbus-next"):
         import pympacds
         from pympacds import (
@@ -136,6 +138,7 @@ def test_import_force_dbus_next(monkeypatch):
 
 def test_import_force_dbus_fast(monkeypatch):
     """PYMPACDS_DBUS_BACKEND=dbus-fast forces the dbus-fast backend."""
+    pytest.importorskip("dbus_fast")
     with PrepareModule(monkeypatch, False, "dbus-fast"):
         import pympacds
         from pympacds import (
@@ -155,6 +158,7 @@ def test_import_force_dbus_fast(monkeypatch):
 
 def test_import_force_dbus_unknown(monkeypatch):
     """PYMPACDS_DBUS_BACKEND with an unknown value falls back to dbus-fast."""
+    pytest.importorskip("dbus_fast")
     with PrepareModule(monkeypatch, False, "dbus-unknown"):
         import pympacds
         from pympacds import (
