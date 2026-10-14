@@ -125,7 +125,7 @@ class GpioShim:
             self._lines = self._chip
             return True
 
-        config = {}
+        config: dict[Any, gpiod.LineSettings | None] = {}
         for off in input_offsets:
             config[off] = gpiod.LineSettings(direction=gpiod.line.Direction.INPUT)
         for off in watch_offsets:
