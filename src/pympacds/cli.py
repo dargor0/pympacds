@@ -9,7 +9,7 @@ import sys
 import textwrap
 from typing import Any
 
-from . import realtime
+from . import realtime, security
 
 
 def _version() -> str:
@@ -131,9 +131,23 @@ def main() -> None:
     )
     sp_install.add_argument(
         "--user",
-        default="pympacds-user",
+        default=None,
         metavar="USER",
-        help="System user the generated unit runs as (default pympacds-user)",
+        help="System user the service runs as (default pympacds-user)",
+    )
+    sp_install.add_argument(
+        "--supp-groups",
+        default=None,
+        metavar="GROUPS",
+        help="Supplementary groups for the service (SupplementaryGroups=); "
+        "comma/space-separated existing group names",
+    )
+    sp_install.add_argument(
+        "--strict",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Apply the default systemd hardening baseline (default: --strict; "
+        "use --no-strict for initial testing only)",
     )
     sp_install.add_argument("--no-enable", action="store_true", help="Skip systemctl enable")
     sp_install.add_argument("--start", action="store_true", help="Start the service after install")
@@ -210,6 +224,18 @@ def main() -> None:
     )
     _add_config_file_arg(cfg_val)
     cfg_val.add_argument("-s", "--schema", metavar="FILE", help="JSON schema file (optional)")
+    cfg_val.add_argument(
+        "--program",
+        metavar="PATH",
+        default="",
+        help="Also validate a program path's ownership/permissions (REQ-SEC-002)",
+    )
+    cfg_val.add_argument(
+        "--user",
+        metavar="USER",
+        default=None,
+        help="Service user for the permission checks (default pympacds-user)",
+    )
 
     args = parser.parse_args()
 
@@ -412,6 +438,33 @@ def _install_packaged_unit(
     _copy_policy(conf_src, conf_dst, dry_run=False)
 
 
+def _write_dropin(path: str, body: str, dry_run: bool) -> None:
+    """Write (or preview, under ``--dry-run``) a systemd drop-in file."""
+    if dry_run:
+        print(f"Would write: {path}")
+        print(body)
+        return
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        f.write(body)
+    print(f"Installed: {path}")
+
+
+def _rt_is_deadline(service_name: str, args: Any) -> bool:
+    """True when the service config requests ``[rt] sched_policy = deadline``.
+
+    Used to omit ``NoNewPrivileges=`` from the hardening baseline for RT units
+    (REQ-SEC-009 §C / REQ-RT-004).
+    """
+    config_path = getattr(args, "config", "") or f"/etc/pympacds/{service_name}.ini"
+    cp = configparser.ConfigParser()
+    if config_path and os.path.exists(config_path):
+        cp.read(config_path)
+    return cp.has_option("rt", "sched_policy") and (
+        cp.get("rt", "sched_policy").strip().lower() == "deadline"
+    )
+
+
 def _apply_systemd(service_name: str, no_enable: bool, start: bool) -> None:
     """Reload systemd and optionally enable/start the service unit."""
     _run(["systemctl", "daemon-reload"])
@@ -421,34 +474,159 @@ def _apply_systemd(service_name: str, no_enable: bool, start: bool) -> None:
         _run(["systemctl", "start", f"pympacds-{service_name}"])
 
 
-def _cmd_install(args) -> None:
-    if not args.dry_run:
-        _ensure_root()
+def _refuse_unsafe_targets(service_name: str, program: str, config_path: str, user: str) -> None:
+    """Fail closed when a privileged program/config path is unsafe (REQ-SEC-002..004)."""
+    problems: list[str] = []
+    if program:
+        problems += security.check_exec_target(program, user)
+    if config_path and os.path.exists(config_path):
+        problems += security.check_config_target(config_path, user)
+    if not problems:
+        return
+    print(f"error: unsafe path for a service running as '{user}':", file=sys.stderr)
+    for problem in problems:
+        print(f"  {problem}", file=sys.stderr)
+    print(
+        f"pympacds-admin: refusing to install pympacds-{service_name}.service",
+        file=sys.stderr,
+    )
+    sys.exit(1)
 
-    service_name = args.service_name
-    dry_run = args.dry_run
-    program = getattr(args, "program", "")
-    config_path = getattr(args, "config", "") or f"/etc/pympacds/{service_name}.ini"
-    user = getattr(args, "user", "pympacds-user")
 
+def _install_unit_files(
+    service_name: str,
+    program: str,
+    user: str,
+    config_path: str,
+    user_arg: str | None,
+    supp_groups: str | None,
+    dropin_dir: str,
+    conf_src: str,
+    conf_dst: str,
+    dry_run: bool,
+) -> None:
+    """Write the unit (generated or packaged) and an identity drop-in."""
     unit_dst = f"/etc/systemd/system/pympacds-{service_name}.service"
-    conf_dst = f"/etc/dbus-1/system.d/{service_name}.conf"
-    conf_src = _find_resource(f"{service_name}.conf")
-
     if program:
         unit_body = _render_unit(service_name, program, user, config_path)
         _install_generated_unit(unit_dst, unit_body, conf_src, conf_dst, dry_run)
     else:
         unit_src = _find_resource(f"pympacds-{service_name}.service")
         _install_packaged_unit(unit_src, unit_dst, conf_src, conf_dst, dry_run)
+    if user_arg is not None or supp_groups:
+        _write_dropin(
+            os.path.join(dropin_dir, "user.conf"),
+            security.render_user_dropin(user, supplementary_groups=supp_groups),
+            dry_run,
+        )
 
-    # real-time drop-in (REQ-RT-004); strict, fail-closed
-    rt_failed = _install_realtime(service_name, args, dry_run=dry_run)
+
+def _install_hardening(
+    service_name: str, args: Any, program: str, strict: bool, dropin_dir: str, dry_run: bool
+) -> None:
+    """Apply/remove the REQ-SEC-009 baseline drop-in for a generated unit."""
+    if not program:
+        if not strict:
+            print(
+                f"note: pympacds-{service_name}.service is pre-hardened; "
+                "--no-strict does not relax the packaged unit.",
+                file=sys.stderr,
+            )
+        return
+    hardening = os.path.join(dropin_dir, "hardening.conf")
+    if strict:
+        _write_dropin(
+            hardening,
+            security.render_hardening_dropin(rt_deadline=_rt_is_deadline(service_name, args)),
+            dry_run,
+        )
+        return
+    _remove_dropin(hardening, dry_run)
+    print(
+        f"warning: pympacds-{service_name}.service installed WITHOUT the hardening "
+        "baseline (--no-strict); do not use in production.",
+        file=sys.stderr,
+    )
+
+
+def _validated_identity(
+    service_name: str, user: str, user_arg: str | None, supp_groups: str | None
+) -> str | None:
+    """Validate identity/groups (REQ-SEC-014); return the normalized groups."""
+    problems = security.validate_service_user(user, require_exists=user_arg is not None)
+    normalized, group_problems = security.parse_supplementary_groups(supp_groups or "")
+    problems += group_problems
+    if problems:
+        for problem in problems:
+            print(f"error: {problem}", file=sys.stderr)
+        sys.exit(1)
+    risky = security.sensitive_supplementary_groups(normalized) if normalized else []
+    if risky:
+        print(
+            "warning: granting high-risk supplementary group(s) to "
+            f"pympacds-{service_name}.service: " + ", ".join(risky),
+            file=sys.stderr,
+        )
+    return normalized or None
+
+
+def _confirm_root_or_exit(service_name: str, user: str, dry_run: bool) -> None:
+    """Require an interactive confirmation before installing a root unit."""
+    if security.is_root_user(user) and not security.confirm_root(service_name, dry_run=dry_run):
+        print(
+            f"pympacds-admin: refusing to install pympacds-{service_name}.service "
+            "as root without confirmation",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
+def _apply_systemd_if_needed(service_name: str, args: Any, dry_run: bool) -> None:
+    if not dry_run:
+        _apply_systemd(
+            service_name,
+            getattr(args, "no_enable", False),
+            getattr(args, "start", False),
+        )
+
+
+def _cmd_install(args) -> None:
+    service_name = args.service_name
+    dry_run = args.dry_run
+    program = getattr(args, "program", "") or ""
+    config_path = getattr(args, "config", "") or f"/etc/pympacds/{service_name}.ini"
+    user_arg = getattr(args, "user", None)
+    user = user_arg or security.DEFAULT_SERVICE_USER
+    strict = getattr(args, "strict", True)
 
     if not dry_run:
-        no_enable = getattr(args, "no_enable", False)
-        start = getattr(args, "start", False)
-        _apply_systemd(service_name, no_enable, start)
+        _ensure_root()
+
+    supp_groups = _validated_identity(
+        service_name, user, user_arg, getattr(args, "supp_groups", None)
+    )
+    _confirm_root_or_exit(service_name, user, dry_run)
+    _refuse_unsafe_targets(service_name, program, config_path, user)
+
+    dropin_dir = f"/etc/systemd/system/pympacds-{service_name}.service.d"
+    conf_src = _find_resource(f"{service_name}.conf")
+    conf_dst = f"/etc/dbus-1/system.d/{service_name}.conf"
+    _install_unit_files(
+        service_name,
+        program,
+        user,
+        config_path,
+        user_arg,
+        supp_groups,
+        dropin_dir,
+        conf_src,
+        conf_dst,
+        dry_run,
+    )
+    _install_hardening(service_name, args, program, strict, dropin_dir, dry_run)
+
+    rt_failed = _install_realtime(service_name, args, dry_run=dry_run)
+    _apply_systemd_if_needed(service_name, args, dry_run)
 
     if rt_failed:
         sys.exit(1)
@@ -1085,6 +1263,18 @@ def _cmd_config_validate(cp, args) -> None:
 
         cm = ConfigManager(schema_file=schema)
         errors.extend(cm.validate(cp))
+
+    # REQ-SEC-007: when a --program is given (an install pre-flight), also check
+    # the ownership/permissions of the program and its config. Plain validation of
+    # an arbitrary INI (no --program) is a content check, not a privileged-path one.
+    user = getattr(args, "user", None) or security.DEFAULT_SERVICE_USER
+    program = getattr(args, "program", "") or ""
+    config_file = getattr(args, "config", "") or ""
+    if program:
+        errors.extend(security.check_exec_target(program, user))
+        if config_file and os.path.exists(config_file):
+            errors.extend(security.check_config_target(config_file, user))
+
     if errors:
         for e in errors:
             print(e, file=sys.stderr)

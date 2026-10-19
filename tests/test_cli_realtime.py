@@ -171,6 +171,9 @@ def test_cmd_install_rt_error_exits(tmp_path, monkeypatch):
     cfg = tmp_path / "svc.ini"
     cfg.write_text("[rt]\nsched_policy = fifo\n")  # invalid: missing priority
     monkeypatch.setattr(cli.os.path, "exists", lambda p: str(p) == str(cfg))
+    # This test targets the [rt] validation path, not file-permission checks.
+    monkeypatch.setattr("pympacds.security.check_config_target", lambda *a, **k: [])
+    monkeypatch.setattr("pympacds.security.check_exec_target", lambda *a, **k: [])
 
     class Args:
         service_name = "svc"
@@ -178,6 +181,7 @@ def test_cmd_install_rt_error_exits(tmp_path, monkeypatch):
         no_enable = True
         start = False
         config = str(cfg)
+        strict = False
 
     with pytest.raises(SystemExit):
         cli._cmd_install(Args)

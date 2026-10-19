@@ -60,6 +60,7 @@ class TestCmdInstall:
             dry_run = False
             no_enable = False
             start = True
+            strict = False
 
         _cmd_install(Args)
         cmd_strs = [" ".join(c) for c in calls]
@@ -98,6 +99,7 @@ class TestCmdInstall:
             dry_run = False
             no_enable = True
             start = False
+            strict = False
 
         _cmd_install(Args)
         cmd_strs = [" ".join(c) for c in calls]
@@ -106,7 +108,13 @@ class TestCmdInstall:
 
     def test_install_dry_run_custom_program(self, tmp_path, monkeypatch, capsys):
         """install --program generates a unit for a custom program/config."""
+        import pwd
+        import shutil
+
         from pympacds.cli import _cmd_install
+
+        current_user = pwd.getpwuid(os.getuid()).pw_name
+        program = shutil.which("true") or "/usr/bin/true"
 
         tpl = tmp_path / "pympacds@.service.in"
         tpl.write_text("User=@USER@\nExecStart=@EXEC_START@ -c /etc/pympacds/%i.ini\n")
@@ -118,14 +126,14 @@ class TestCmdInstall:
         class Args:
             service_name = "mysvc"
             dry_run = True
-            program = "/usr/local/bin/myapp"
-            user = "svcuser"
-            config = "/etc/myapp/myapp.ini"
+            user = current_user
+            config = ""
 
+        Args.program = program
         _cmd_install(Args)
         out = capsys.readouterr().out
-        assert "User=svcuser" in out
-        assert "ExecStart=/usr/local/bin/myapp -c /etc/myapp/myapp.ini" in out
+        assert f"User={current_user}" in out
+        assert f"ExecStart={program} -c /etc/pympacds/mysvc.ini" in out
 
 
 class TestRenderUnit:

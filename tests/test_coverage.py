@@ -556,6 +556,7 @@ def test_cli_install_full(monkeypatch, tmp_path):
         dry_run = False
         no_enable = False
         start = True
+        strict = False
 
     _cmd_install(Args)
     assert len(calls) >= 3
