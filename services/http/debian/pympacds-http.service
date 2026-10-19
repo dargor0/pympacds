@@ -6,9 +6,31 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+User=pympacds-user
+Group=pympacds-user
 ExecStart=/usr/bin/pympacds-http -c /etc/pympacds/http.ini
 Restart=always
 RestartSec=5
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+PrivateDevices=yes
+DevicePolicy=closed
+NoNewPrivileges=yes
+ProtectSystem=strict
+LogsDirectory=pympacds
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+UMask=0027
+RemoveIPC=yes
 
 [Install]
 WantedBy=multi-user.target

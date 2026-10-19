@@ -71,6 +71,17 @@ and `User=USER` (default `pympacds-user`, `CONFIG` default
 `/etc/pympacds/SERVICE.ini`). Use this to run your own executable under
 pympacds without shipping a `.service` file.
 
+**Security.** In both modes `--program` and `--config` are validated before
+anything is written: the symlink-resolved file and every ancestor directory must
+be owned by `root` or the service user and not group/other-writable (paths under
+world-writable directories such as `/tmp` are rejected). On violation the command
+writes nothing and exits non-zero — there is no override. Running a service as
+`root` (`--user root`) additionally requires an **interactive** confirmation.
+
+**Hardening.** By default (`--strict`) a safe hardening baseline is written to
+`/etc/systemd/system/pympacds-SERVICE.service.d/hardening.conf`; `--no-strict`
+(initial testing only) omits it. See [Security model](security.md).
+
 In both modes the `[rt]` section of the service INI file is read and, when
 valid, a soft real-time drop-in
 `/etc/systemd/system/pympacds-SERVICE.service.d/rt.conf` is generated. If the
@@ -94,8 +105,19 @@ Options:
   `/usr/bin/pympacds-SERVICE`.
 
 `--user USER`
-: System user the generated unit runs as (default `pympacds-user`). Only used
-  when generating a unit with `--program`.
+: System user the service runs as (default `pympacds-user`). For a generated
+  unit it is written into the unit; for a packaged unit it is applied via a
+  drop-in. `root` requires an interactive confirmation.
+
+`--supp-groups GROUPS`
+: Supplementary groups for the service (`SupplementaryGroups=`), applied via the
+  identity drop-in. Comma/space-separated **existing** group names; malformed or
+  unknown names are rejected. Granting a high-risk group (e.g. `disk`, `docker`,
+  `shadow`) prints a warning. Use the narrowest group that works (e.g. `gpio`).
+
+`--strict` / `--no-strict`
+: Apply the default systemd hardening baseline (`--strict`, the default) or omit
+  it (`--no-strict`, for initial testing only; prints a warning).
 
 `--no-enable`
 : Skip `systemctl enable` after installing.
