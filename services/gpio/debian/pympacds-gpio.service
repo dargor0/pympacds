@@ -5,13 +5,30 @@ Requires=dbus.service
 
 [Service]
 Type=simple
+User=pympacds-user
+Group=pympacds-user
+SupplementaryGroups=gpio
 ExecStart=/usr/bin/pympacds-gpio -c /etc/pympacds/gpio.ini
 Restart=always
 RestartSec=5
-# Run unprivileged: create a service user and add it to the 'gpio' group
-# (see the udev rule shipped by this package), then uncomment:
-#User=pympacds
-#Group=gpio
+RestrictAddressFamilies=AF_UNIX
+NoNewPrivileges=yes
+ProtectSystem=strict
+LogsDirectory=pympacds
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+UMask=0027
+RemoveIPC=yes
 
 [Install]
 WantedBy=multi-user.target
