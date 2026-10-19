@@ -14,6 +14,7 @@ contracts
 middleware
 signal_action
 real-time
+security
 tags
 cli
 api
