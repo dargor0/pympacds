@@ -1,3 +1,19 @@
+pympacds (0.4.0-1) UNRELEASED; urgency=medium
+
+  * Security: validate the ownership and permissions of the service program
+    and config before installing a unit; fail closed and never override.
+  * Security: run every service as the core `pympacds-user`, never root; a
+    root installation requires an interactive confirmation.
+  * Security: add a default systemd hardening baseline plus a `--no-strict`
+    testing mode, and ship hardened service units.
+  * Security: validate `--user` and `--supp-groups`, rejecting malformed or
+    unknown principals and warning about high-risk groups.
+  * Add `doc/security.md` describing the core, service and admin-tool model.
+  * Fixes issue 17 (pympacds-admin install does not validate program/config
+    file permissions (privilege-escalation risk)).
+
+ -- Oscar Diaz <odiaz@ieee.org>  Mon, 19 Oct 2026 13:51:01 -0500
+
 pympacds (0.3.2-1) UNRELEASED; urgency=medium
 
   * Add project metadata, missing LICENSE file, added
