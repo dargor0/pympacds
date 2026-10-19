@@ -1,3 +1,11 @@
+pympacds-gpio (0.1.3-1) UNRELEASED; urgency=medium
+
+  * Run as the core `pympacds-user` with `SupplementaryGroups=gpio` (device
+    access via udev + the group) and ship the default systemd hardening
+    baseline.
+
+ -- Oscar Diaz <odiaz@ieee.org>  Mon, 19 Oct 2026 14:01:34 -0500
+
 pympacds-gpio (0.1.2-1) UNRELEASED; urgency=medium
 
   * Ship the README in /usr/share/doc and document pip/PPA installation.
